@@ -131,6 +131,15 @@ export const CSS_CLASSES = {
 	COLUMN_RESIZE_HANDLE: 'obk-column-resize-handle',
 	COLUMN_RESIZING: 'obk-column--resizing',
 
+	// Board toolbar (in-flow strip above the columns)
+	BOARD_TOOLBAR: 'obk-board-toolbar',
+
+	// Minimal (zen) mode: hide property labels via a toggle
+	MINIMAL: 'obk-minimal',
+	MINIMAL_TOGGLE: 'obk-minimal-toggle',
+	MINIMAL_TOGGLE_ICON: 'obk-minimal-toggle-icon',
+	MINIMAL_TOGGLE_ACTIVE: 'obk-minimal-toggle--active',
+
 	// Quick add modal
 	QUICK_ADD_FORM: 'obk-quick-add-form',
 	QUICK_ADD_INPUT: 'obk-quick-add-input',

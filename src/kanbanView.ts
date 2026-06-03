@@ -1,5 +1,5 @@
 import type { BasesEntry, BasesPropertyId, BasesViewConfig, HoverPopover, QueryController, ViewOption } from 'obsidian';
-import { BasesView, Keymap, Notice, normalizePath, parsePropertyId } from 'obsidian';
+import { BasesView, Keymap, Notice, normalizePath, parsePropertyId, setIcon } from 'obsidian';
 import {
 	createCard as createCardEl,
 	computeCardFingerprint,
@@ -167,6 +167,8 @@ export class KanbanView extends BasesView {
 	 */
 	private _dragging = false;
 	private _activeCardPath: string | null = null;
+	private _minimalMode = false;
+	private _minimalToggleEl: HTMLElement | null = null;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, legacyData: LegacyData | null = null) {
 		super(controller);
@@ -229,6 +231,7 @@ export class KanbanView extends BasesView {
 		this.cardTitlePropertyId = this.config.getAsPropertyId('cardTitleProperty');
 		this.imagePropertyId = this.config.getAsPropertyId('imageProperty');
 		this.cardColorPropertyId = this.config.getAsPropertyId('cardColorProperty');
+		this._minimalMode = this.config.get('minimalMode') === true;
 	}
 
 	/**
@@ -587,6 +590,8 @@ export class KanbanView extends BasesView {
 				this.patchBoard(orderedValues, lanes, hasSwimlanes);
 			}
 			this.reapplyActiveCard();
+			this._applyMinimalMode();
+			this._ensureMinimalToggle();
 		} catch (error) {
 			console.error('KanbanView error:', error);
 		}
@@ -1104,6 +1109,59 @@ export class KanbanView extends BasesView {
 		} else {
 			this.containerEl.style.removeProperty('--obk-column-width');
 		}
+	}
+
+	/** Toggle the minimal-mode class (hides property labels) on the container. */
+	private _applyMinimalMode(): void {
+		this.containerEl.classList.toggle(CSS_CLASSES.MINIMAL, this._minimalMode);
+	}
+
+	/**
+	 * Ensure the top-right minimal-mode toggle button exists and reflects state.
+	 * The container is emptied on full rebuilds, so re-create the button when it
+	 * is no longer attached. Clicking flips minimal mode and persists it.
+	 */
+	private _ensureMinimalToggle(): void {
+		if (!this._minimalToggleEl || !this.containerEl.contains(this._minimalToggleEl)) {
+			// In-flow toolbar pinned to the top of the board (no overlay positioning).
+			const toolbar = this.containerEl.createDiv({ cls: CSS_CLASSES.BOARD_TOOLBAR });
+			this.containerEl.prepend(toolbar);
+
+			const btn = toolbar.createDiv({ cls: CSS_CLASSES.MINIMAL_TOGGLE });
+			btn.setAttribute('role', 'button');
+			btn.setAttribute('tabindex', '0');
+			btn.setAttribute('aria-label', t('label.minimalMode'));
+			const iconEl = btn.createSpan({ cls: CSS_CLASSES.MINIMAL_TOGGLE_ICON });
+			setIcon(iconEl, 'eye-off');
+			btn.createSpan({ text: t('label.minimalShort') });
+			const toggle = () => {
+				this._minimalMode = !this._minimalMode;
+				this.config?.set('minimalMode', this._minimalMode);
+				this._applyMinimalMode();
+				this._updateMinimalToggleState();
+			};
+			btn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				toggle();
+			});
+			btn.addEventListener('keydown', (e) => {
+				if (e.key !== 'Enter' && e.key !== ' ') return;
+				e.preventDefault();
+				toggle();
+			});
+			this._minimalToggleEl = btn;
+		}
+		this._updateMinimalToggleState();
+	}
+
+	private _updateMinimalToggleState(): void {
+		const btn = this._minimalToggleEl;
+		if (!btn) return;
+		btn.classList.toggle(CSS_CLASSES.MINIMAL_TOGGLE_ACTIVE, this._minimalMode);
+		// Swap only the icon span; leave the text label untouched (no duplicates).
+		const iconEl = btn.querySelector<HTMLElement>(`.${CSS_CLASSES.MINIMAL_TOGGLE_ICON}`);
+		if (iconEl) setIcon(iconEl, this._minimalMode ? 'eye' : 'eye-off');
+		btn.setAttribute('aria-pressed', String(this._minimalMode));
 	}
 
 	private createColumn(

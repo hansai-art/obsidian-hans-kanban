@@ -22,6 +22,8 @@ export const en = {
 
 	'label.uncategorized': 'Uncategorized',
 	'label.noColor': 'No color',
+	'label.minimalMode': 'Minimal mode (hide labels)',
+	'label.minimalShort': 'Minimal',
 	'notice.sortedCardOrder': '⚠️ Sort is active. Clear it to manually reorder cards within a column.',
 	'empty.noEntries': 'No entries found. Add some notes to your base.',
 	'empty.noProperties': 'No properties found in entries.',
