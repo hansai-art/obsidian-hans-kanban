@@ -316,8 +316,6 @@ export function createMockApp(imageFiles: Record<string, { path: string }> = {})
 		} as any,
 		metadataCache: {
 			getFirstLinkpathDest: (linkpath: string, _sourcePath: string) => imageFiles[linkpath] ?? null,
-			on: (_name: string, callback: (...args: any[]) => any) => ({ callback }),
-			offref: (_ref: unknown) => {},
 		} as any,
 		vault: {
 			getMarkdownFiles: () => markdownFiles,
