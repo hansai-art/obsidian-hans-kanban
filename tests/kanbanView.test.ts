@@ -1303,7 +1303,8 @@ describe('Drag and Drop - Card Drop Handling', () => {
 			newIndex: 0,
 		};
 
-		// Call handleCardDrop
+		// Call handleCardDrop (reset first: the render-time color sweep also writes)
+		app.fileManager.processFrontMatter.calls.length = 0;
 		await (view as any).handleCardDrop(mockEvent);
 
 		// Verify processFrontMatter was called
@@ -1391,6 +1392,7 @@ describe('Drag and Drop - Card Drop Handling', () => {
 			newIndex: 0,
 		};
 
+		app.fileManager.processFrontMatter.calls.length = 0; // ignore render-time color sweep
 		await (view as any).handleCardDrop(mockEvent);
 
 		// Verify processFrontMatter was called with empty string logic
@@ -1430,7 +1432,8 @@ describe('Drag and Drop - Drop Error Handling', () => {
 			newIndex: 0,
 		};
 
-		// Should not throw
+		// Should not throw (reset first: render-time color sweep also writes)
+		app.fileManager.processFrontMatter.calls.length = 0;
 		await (view as any).handleCardDrop(mockEvent);
 
 		// Should not call processFrontMatter
@@ -1459,6 +1462,7 @@ describe('Drag and Drop - Drop Error Handling', () => {
 			newIndex: 0,
 		};
 
+		app.fileManager.processFrontMatter.calls.length = 0; // ignore render-time color sweep
 		await (view as any).handleCardDrop(mockEvent);
 
 		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'processFrontMatter should not be called');
@@ -4014,9 +4018,16 @@ describe('Card Color - auto-color and custom override', () => {
 		return view;
 	}
 
-	test('every value auto-gets a color even without a leading emoji', () => {
+	/** Rendered view with the render-time color-sweep writes already discarded. */
+	function makeRenderedView(): any {
 		const view = makeColoredView();
 		triggerDataUpdate(view);
+		app.fileManager.processFrontMatter.calls.length = 0;
+		return view;
+	}
+
+	test('every value auto-gets a color even without a leading emoji', () => {
+		const view = makeRenderedView();
 
 		// To Do / Doing / Done carry no emoji, yet each resolves to a palette color.
 		for (const value of ['To Do', 'Doing', 'Done']) {
@@ -4027,9 +4038,25 @@ describe('Card Color - auto-color and custom override', () => {
 
 	const KNOWN_EMOJIS = Object.values(COLOR_NAME_TO_EMOJI);
 
-	test('picking a color writes that color emoji into the value across matching cards', async () => {
+	test('render-time sweep colors every raw value already on the board', async () => {
 		const view = makeColoredView();
 		triggerDataUpdate(view);
+
+		// All 5 entries carry raw (emoji-less) values → each gets swept exactly once.
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 5, 'every raw card swept on render');
+		const call = app.fileManager.processFrontMatter.calls.find((c: any[]) => c[0].path === 'Task 1.md');
+		assert.ok(call, 'Task 1.md should be among the swept files');
+		const fm: Record<string, unknown> = { status: 'To Do' };
+		await call[1](fm);
+		const written = fm.status as string;
+		assert.ok(
+			written.endsWith(' To Do') && KNOWN_EMOJIS.includes([...written][0]),
+			`sweep should prepend a color emoji, got "${written}"`,
+		);
+	});
+
+	test('picking a color writes that color emoji into the value across matching cards', async () => {
+		const view = makeRenderedView();
 
 		(view as any).openCardColorPicker(scrollEl, 'To Do');
 		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
@@ -4073,8 +4100,7 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('choosing "none" resets the value to the auto palette color', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
 
 		(view as any).openCardColorPicker(scrollEl, 'To Do');
 		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
@@ -4089,8 +4115,10 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('_autoColorEmoji rewrites an emoji-less value for a card on this board', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
+		// Let the render-time sweep's .finally() clear its re-entrancy guard first.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		app.fileManager.processFrontMatter.calls.length = 0;
 
 		await (view as any)._autoColorEmoji({ path: 'Task 1.md' } as any, { frontmatter: { status: 'To Do' } });
 
@@ -4102,8 +4130,7 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('_autoColorEmoji ignores files that are not part of this board', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
 
 		await (view as any)._autoColorEmoji({ path: 'Somewhere Else.md' } as any, { frontmatter: { status: '緊急' } });
 
@@ -4111,8 +4138,7 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('_autoColorEmoji leaves an already-colored value untouched', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
 
 		await (view as any)._autoColorEmoji({ path: 'Task 1.md' } as any, { frontmatter: { status: '🔴 To Do' } });
 
@@ -4120,8 +4146,7 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('setCardProperty auto-prepends a palette emoji for an emoji-less value', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
 
 		await (view as any).setCardProperty({ file: {} } as any, PROPERTY_STATUS, 'Backlog');
 
@@ -4134,8 +4159,7 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('setCardProperty leaves a value that already carries a color emoji untouched', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
 
 		await (view as any).setCardProperty({ file: {} } as any, PROPERTY_STATUS, '🔴 緊急');
 
@@ -4145,8 +4169,7 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('setCardProperty honours a custom override when choosing the emoji', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
 		(view as any)._cardColorPrefs['Backlog'] = 'purple';
 
 		await (view as any).setCardProperty({ file: {} } as any, PROPERTY_STATUS, 'Backlog');
@@ -4161,8 +4184,7 @@ describe('Card Color - auto-color and custom override', () => {
 	});
 
 	test('setCardProperty does not touch non-color properties', async () => {
-		const view = makeColoredView();
-		triggerDataUpdate(view);
+		const view = makeRenderedView();
 
 		await (view as any).setCardProperty({ file: {} } as any, 'note.other' as any, 'Backlog');
 

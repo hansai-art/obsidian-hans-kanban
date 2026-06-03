@@ -81,7 +81,8 @@ describe('Integration Tests - Full Workflow', () => {
 			newIndex: 0,
 		};
 
-		// Perform drop
+		// Perform drop (reset first: the render-time color sweep also writes frontmatter)
+		app.fileManager.processFrontMatter.calls.length = 0;
 		await (view as any).handleCardDrop(mockEvent);
 
 		// Verify property is updated

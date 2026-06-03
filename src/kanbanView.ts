@@ -550,6 +550,13 @@ export class KanbanView extends BasesView {
 			// Distinct values + color map for the card-color / status property.
 			this._computeCardColors(entries);
 
+			// Catch-up pass: color any raw value already sitting on the board, e.g.
+			// typed while the board was closed (the metadataCache listener only lives
+			// while a view instance is open) or a brand-new card whose first change
+			// event raced the entry-map rebuild. Self-terminating: rewritten values
+			// carry an emoji, so the next render's sweep skips them.
+			this._sweepColorEmoji(entries);
+
 			// Global column width slider → CSS variable on the container.
 			this._applyGlobalColumnWidth();
 
@@ -1443,6 +1450,38 @@ export class KanbanView extends BasesView {
 	 * against reacting to its own write (the rewritten value carries an emoji, so a
 	 * second pass returns early anyway, but the guard avoids a redundant write).
 	 */
+	/**
+	 * Catch-up sweep run on every render: prepend a color emoji to any in-board
+	 * card-color value that lacks one. Complements _autoColorEmoji, which only
+	 * reacts to live metadata changes while this view instance is open.
+	 */
+	private _sweepColorEmoji(entries: BasesEntry[]): void {
+		if (!this.cardColorPropertyId || !this.app?.fileManager) return;
+		const parsed = parsePropertyId(this.cardColorPropertyId);
+		if (parsed.type !== 'note' || !parsed.name) return;
+		const propertyName = parsed.name;
+		for (const entry of entries) {
+			const raw = entry.getValue(this.cardColorPropertyId)?.toString().trim() ?? '';
+			if (!raw) continue;
+			const leadEmoji = [...raw][0] ?? '';
+			if (EMOJI_COLOR_MAP[leadEmoji]) continue; // already colored
+			const colored = this._withColorEmoji(raw);
+			if (colored === raw) continue;
+			const path = entry.file.path;
+			if (this._normalizingColorPaths.has(path)) continue;
+			this._normalizingColorPaths.add(path);
+			void this.app.fileManager
+				.processFrontMatter(entry.file, (frontmatter: Record<string, unknown>) => {
+					const current = frontmatter[propertyName];
+					if (typeof current === 'string' && current.trim() === raw) {
+						frontmatter[propertyName] = colored;
+					}
+				})
+				.catch((error: unknown) => console.error('KanbanView: color-emoji sweep failed', error))
+				.finally(() => this._normalizingColorPaths.delete(path));
+		}
+	}
+
 	private async _autoColorEmoji(file: TFile, cache: CachedMetadata | null): Promise<void> {
 		if (!this.cardColorPropertyId || !this.app?.fileManager) return;
 		if (!this._entryMap.has(file.path)) return;
