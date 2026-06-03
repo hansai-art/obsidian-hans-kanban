@@ -55,7 +55,7 @@ describe('Plugin Registration', () => {
 
 		// Verify registration
 		assert.strictEqual(registeredViewType, KANBAN_VIEW_TYPE, 'View type should match constant');
-		assert.strictEqual(registeredName, 'Kanban', 'View name should be "Kanban"');
+		assert.strictEqual(registeredName, 'Hans Kanban', 'View name should be "Hans Kanban"');
 		assert.strictEqual(registeredIcon, 'columns', 'View icon should be "columns"');
 		assert.notStrictEqual(factoryController, null, 'Factory should receive controller');
 		assert.notStrictEqual(factoryScrollEl, null, 'Factory should receive scrollEl');
