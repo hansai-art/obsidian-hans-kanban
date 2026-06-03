@@ -4038,6 +4038,73 @@ describe('Card Color - auto-color and custom override', () => {
 
 	const KNOWN_EMOJIS = Object.values(COLOR_NAME_TO_EMOJI);
 
+	test('_withColorEmoji leaves empty / whitespace-only values unchanged', () => {
+		const view = makeRenderedView();
+		assert.strictEqual((view as any)._withColorEmoji(''), '', 'empty stays empty');
+		assert.strictEqual((view as any)._withColorEmoji('   '), '   ', 'whitespace stays unchanged');
+	});
+
+	test('sweep colors a numeric frontmatter value (phase: 123)', async () => {
+		const controller2: any = createMockQueryController(
+			[createMockBasesEntry(createMockTFile('N.md'), { [PROPERTY_STATUS]: 123 })],
+			TEST_PROPERTIES,
+		);
+		controller2.app = app;
+		controller2.config.getAsPropertyId = (key: string) =>
+			key === 'groupByProperty' || key === 'cardColorProperty' ? PROPERTY_STATUS : null;
+		const view = new KanbanView(controller2, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 1, 'numeric value swept');
+		const fm: Record<string, unknown> = { status: 123 };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		const written = fm.status as string;
+		assert.ok(
+			typeof written === 'string' && written.endsWith(' 123') && KNOWN_EMOJIS.includes([...written][0]),
+			`numeric frontmatter should be coerced and colored, got "${String(written)}"`,
+		);
+	});
+
+	test('picker on an emoji-only value writes nothing', () => {
+		const view = makeRenderedView();
+
+		(view as any).openCardColorPicker(scrollEl, '🔴');
+		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
+		const green = Array.from(popover.querySelectorAll('.obk-column-color-swatch')).find(
+			(s) => (s as HTMLElement).title === 'green',
+		) as HTMLElement;
+		green.click();
+
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'emoji-only value must not be rewritten');
+	});
+
+	test('a spent picker leaves no document listener that clobbers a newer picker', () => {
+		const view = makeRenderedView();
+
+		// Open picker A and consume it via a swatch click.
+		(view as any).openCardColorPicker(scrollEl, 'To Do');
+		const popA = document.querySelector('.obk-column-color-popover') as HTMLElement;
+		(
+			Array.from(popA.querySelectorAll('.obk-column-color-swatch')).find(
+				(s) => (s as HTMLElement).title === 'green',
+			) as HTMLElement
+		).click();
+
+		// Open picker B, then click INSIDE B's popover: a leaked dismiss listener
+		// from A would treat that click as "outside A" and null activeColorPicker.
+		(view as any).openCardColorPicker(scrollEl, 'Doing');
+		const popB = document.querySelector('.obk-column-color-popover') as HTMLElement;
+		assert.ok(popB, 'picker B should open');
+		popB.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+		assert.strictEqual((view as any).activeColorPicker, popB, 'picker B must survive a click inside itself');
+
+		// Dismiss B via an outside click so no popover leaks into later tests.
+		document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		assert.strictEqual(document.querySelector('.obk-column-color-popover'), null, 'picker B dismissed');
+	});
+
 	test('render-time sweep colors every raw value already on the board', async () => {
 		const view = makeColoredView();
 		triggerDataUpdate(view);

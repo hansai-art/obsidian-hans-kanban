@@ -68,6 +68,17 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
 
+/**
+ * Frontmatter scalar → string for card-color comparison. Numbers count
+ * (`phase: 123` renders as "123"); everything else (lists, booleans, null)
+ * returns null so callers skip rather than mis-compare.
+ */
+function frontmatterString(value: unknown): string | null {
+	if (typeof value === 'string') return value;
+	if (typeof value === 'number') return String(value);
+	return null;
+}
+
 function isStringArray(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
@@ -139,6 +150,8 @@ export class KanbanView extends BasesView {
 	 */
 	private _metadataChangeRef: EventRef | null = null;
 	private _normalizingColorPaths: Set<string> = new Set();
+	/** Set at the top of onClose; guards late renders/sweeps on a dead view. */
+	private _closed = false;
 	private _columnSortables: Map<string, Sortable> = new Map();
 	private _entryMap: Map<string, BasesEntry> = new Map();
 	private swimlaneSortable: Sortable | null = null;
@@ -260,6 +273,7 @@ export class KanbanView extends BasesView {
 		}
 
 		this._debouncedRender = debounce(() => {
+			if (this._closed) return;
 			try {
 				this.loadConfig();
 				this.render();
@@ -1423,6 +1437,7 @@ export class KanbanView extends BasesView {
 	 * user override wins, else palette-by-index over the current value list.
 	 */
 	private _withColorEmoji(value: string): string {
+		if (!value.trim()) return value; // nothing to color (empty / emoji-only leftovers)
 		const leadEmoji = [...value][0] ?? '';
 		if (EMOJI_COLOR_MAP[leadEmoji]) return value;
 		const override = this._cardColorPrefs[value];
@@ -1456,7 +1471,7 @@ export class KanbanView extends BasesView {
 	 * reacts to live metadata changes while this view instance is open.
 	 */
 	private _sweepColorEmoji(entries: BasesEntry[]): void {
-		if (!this.cardColorPropertyId || !this.app?.fileManager) return;
+		if (this._closed || !this.cardColorPropertyId || !this.app?.fileManager) return;
 		const parsed = parsePropertyId(this.cardColorPropertyId);
 		if (parsed.type !== 'note' || !parsed.name) return;
 		const propertyName = parsed.name;
@@ -1472,8 +1487,10 @@ export class KanbanView extends BasesView {
 			this._normalizingColorPaths.add(path);
 			void this.app.fileManager
 				.processFrontMatter(entry.file, (frontmatter: Record<string, unknown>) => {
-					const current = frontmatter[propertyName];
-					if (typeof current === 'string' && current.trim() === raw) {
+					// Numbers count too: `phase: 123` renders as "123" — without the
+					// coercion the guard never matches and the sweep retries forever.
+					const current = frontmatterString(frontmatter[propertyName]);
+					if (current !== null && current.trim() === raw) {
 						frontmatter[propertyName] = colored;
 					}
 				})
@@ -1483,14 +1500,14 @@ export class KanbanView extends BasesView {
 	}
 
 	private async _autoColorEmoji(file: TFile, cache: CachedMetadata | null): Promise<void> {
-		if (!this.cardColorPropertyId || !this.app?.fileManager) return;
+		if (this._closed || !this.cardColorPropertyId || !this.app?.fileManager) return;
 		if (!this._entryMap.has(file.path)) return;
 		if (this._normalizingColorPaths.has(file.path)) return;
 		const parsed = parsePropertyId(this.cardColorPropertyId);
 		if (parsed.type !== 'note' || !parsed.name) return;
 		const propertyName = parsed.name;
-		const raw: unknown = cache?.frontmatter?.[propertyName];
-		if (typeof raw !== 'string') return;
+		const raw = frontmatterString(cache?.frontmatter?.[propertyName]);
+		if (raw === null) return;
 		const value = raw.trim();
 		if (!value) return;
 		const leadEmoji = [...value][0] ?? '';
@@ -1500,8 +1517,8 @@ export class KanbanView extends BasesView {
 		this._normalizingColorPaths.add(file.path);
 		try {
 			await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
-				const current = frontmatter[propertyName];
-				if (typeof current === 'string' && current.trim() === value) {
+				const current = frontmatterString(frontmatter[propertyName]);
+				if (current !== null && current.trim() === value) {
 					frontmatter[propertyName] = colored;
 				}
 			});
@@ -1527,6 +1544,15 @@ export class KanbanView extends BasesView {
 		const popover = anchorEl.doc.createElement('div');
 		popover.className = CSS_CLASSES.COLUMN_COLOR_POPOVER;
 
+		// Single teardown path: removes the popover AND the document-level dismiss
+		// listener (a bare popover.remove() would leave the listener behind, where
+		// its next firing could null out a newer picker's activeColorPicker).
+		const cleanup = (): void => {
+			popover.remove();
+			if (this.activeColorPicker === popover) this.activeColorPicker = null;
+			anchorEl.doc.removeEventListener('click', dismiss);
+		};
+
 		const currentColor = columnEl.getAttribute(DATA_ATTRIBUTES.COLUMN_COLOR);
 
 		const noneSwatch = anchorEl.doc.createElement('div');
@@ -1537,8 +1563,7 @@ export class KanbanView extends BasesView {
 			this.applyColumnColor(columnEl, null);
 			delete this._prefs.columnColors[columnValue];
 			this._persistPrefs();
-			popover.remove();
-			this.activeColorPicker = null;
+			cleanup();
 		});
 		popover.appendChild(noneSwatch);
 
@@ -1552,8 +1577,7 @@ export class KanbanView extends BasesView {
 				this.applyColumnColor(columnEl, color.name);
 				this._prefs.columnColors[columnValue] = color.name;
 				this._persistPrefs();
-				popover.remove();
-				this.activeColorPicker = null;
+				cleanup();
 			});
 			popover.appendChild(swatch);
 		}
@@ -1565,11 +1589,7 @@ export class KanbanView extends BasesView {
 		this.activeColorPicker = popover;
 
 		const dismiss = (e: MouseEvent) => {
-			if (e.target instanceof Node && !popover.contains(e.target) && e.target !== anchorEl) {
-				popover.remove();
-				this.activeColorPicker = null;
-				anchorEl.doc.removeEventListener('click', dismiss);
-			}
+			if (e.target instanceof Node && !popover.contains(e.target) && e.target !== anchorEl) cleanup();
 		};
 		anchorEl.doc.addEventListener('click', dismiss);
 	}
@@ -1592,12 +1612,19 @@ export class KanbanView extends BasesView {
 		const leadEmoji = [...value][0] ?? '';
 		const currentColor = EMOJI_COLOR_MAP[leadEmoji] ?? this._cardColorPrefs[value] ?? null;
 
-		const choose = (colorName: string | null): void => {
+		// Single teardown path (popover + document dismiss listener), see openColorPicker.
+		const cleanup = (): void => {
 			popover.remove();
-			this.activeColorPicker = null;
+			if (this.activeColorPicker === popover) this.activeColorPicker = null;
+			anchorEl.doc.removeEventListener('click', dismiss);
+		};
+
+		const choose = (colorName: string | null): void => {
+			cleanup();
 			const propertyId = this.cardColorPropertyId;
 			if (!propertyId) return;
 			const bare = this._stripLeadingColorEmoji(value);
+			if (!bare.trim()) return; // emoji-only value: nothing meaningful to recolor
 			const emoji = colorName ? COLOR_NAME_TO_EMOJI[colorName] : '';
 			// colorName set → that color's emoji; "none" → let the auto palette pick.
 			const newValue = colorName && emoji ? `${emoji} ${bare}` : this._withColorEmoji(bare);
@@ -1630,11 +1657,7 @@ export class KanbanView extends BasesView {
 		this.activeColorPicker = popover;
 
 		const dismiss = (e: MouseEvent) => {
-			if (e.target instanceof Node && !popover.contains(e.target) && e.target !== anchorEl) {
-				popover.remove();
-				this.activeColorPicker = null;
-				anchorEl.doc.removeEventListener('click', dismiss);
-			}
+			if (e.target instanceof Node && !popover.contains(e.target) && e.target !== anchorEl) cleanup();
 		};
 		anchorEl.doc.addEventListener('click', dismiss);
 	}
@@ -1961,16 +1984,21 @@ export class KanbanView extends BasesView {
 	}
 
 	onClose(): void {
+		// Tear down event paths FIRST: the flush below writes config, which can make
+		// the Bases host emit onDataUpdated / metadata events while we are closing.
+		// Mark closed (guards any already-queued debounced render), detach the
+		// metadata listener, then cancel the debounce.
+		this._closed = true;
+		if (this._metadataChangeRef && this.app?.metadataCache?.offref) {
+			this.app.metadataCache.offref(this._metadataChangeRef);
+			this._metadataChangeRef = null;
+		}
+		this._debouncedRender.cancel();
 		// Flush any in-session pref changes (card/column order, colors, widths) to
 		// the .base config now. We deliberately never write config during a session
 		// because each write makes the Bases host rebuild the whole view (a visible
 		// flash); on close the view is going away, so the rebuild is invisible.
 		this._flushPrefs();
-		this._debouncedRender.cancel();
-		if (this._metadataChangeRef && this.app?.metadataCache?.offref) {
-			this.app.metadataCache.offref(this._metadataChangeRef);
-			this._metadataChangeRef = null;
-		}
 		this.destroySortables();
 		this.activeColorPicker?.remove();
 		this.activeColorPicker = null;
