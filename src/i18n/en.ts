@@ -38,6 +38,16 @@ export const en = {
 	'quickAdd.add': 'Add',
 	'quickAdd.addCardTo': 'Add card to',
 	'quickAdd.folderNotFound': 'Quick add folder not found:',
+
+	'command.createDemo': 'Create demo board',
+	'demo.promptTitle': '👋 Welcome to Hans Kanban',
+	'demo.promptBody':
+		'Want to see it in action right away? I can create a small sample board with colored cards you can drag and switch. Nothing else in your vault is touched.',
+	'demo.create': 'Create demo board',
+	'demo.skip': 'Not now',
+	'demo.created': 'Demo board created. Drag a card or switch its status to see it work.',
+	'demo.exists': 'The demo board already exists, so I opened it for you.',
+	'demo.failed': 'Could not create the demo board.',
 } as const;
 
 export type StringKey = keyof typeof en;

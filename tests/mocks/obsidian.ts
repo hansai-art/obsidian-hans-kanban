@@ -119,6 +119,18 @@ export class Plugin {
 	async onload(): Promise<void> {}
 	onunload(): void {}
 
+	addCommand(command: any): any {
+		return command;
+	}
+
+	async loadData(): Promise<unknown> {
+		return null;
+	}
+
+	async saveData(_data: unknown): Promise<void> {
+		// Mock implementation
+	}
+
 	registerBasesView?(viewType: string, options: any): void {
 		// Mock implementation
 	}

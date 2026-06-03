@@ -7,6 +7,11 @@ import { createDivWithMethods, createMockQueryController, setupTestEnvironment }
 
 setupTestEnvironment();
 
+// Minimal app stub: onload offers the first-run demo modal via
+// workspace.onLayoutReady, so the mock app must expose it (as a no-op so no
+// demo files are created during tests).
+const makeApp = (): any => ({ workspace: { onLayoutReady: (_cb: () => void) => {} } });
+
 describe('Plugin Registration', () => {
 	test('Plugin loads and registers view correctly', async () => {
 		// Mock the plugin's registerBasesView method
@@ -18,7 +23,7 @@ describe('Plugin Registration', () => {
 		let registeredHoverSourceId: string | null = null;
 		let registeredHoverSourceInfo: any = null;
 
-		const mockApp = {} as any;
+		const mockApp = makeApp();
 		const plugin = new KanbanBasesViewPlugin(mockApp, {} as any);
 		plugin.loadData = async () => null;
 
@@ -71,7 +76,7 @@ describe('Plugin Registration', () => {
 		const scrollEl = createDivWithMethods();
 		const controller = createMockQueryController();
 
-		const plugin = new KanbanBasesViewPlugin({} as any, {} as any);
+		const plugin = new KanbanBasesViewPlugin(makeApp(), {} as any);
 		plugin.loadData = async () => null;
 
 		// Mock registerBasesView to get the factory
@@ -101,7 +106,7 @@ describe('Plugin Registration', () => {
 
 describe('Legacy Data Parsing', () => {
 	async function getFactoryLegacyData(storedData: unknown): Promise<any> {
-		const plugin = new KanbanBasesViewPlugin({} as any, {} as any);
+		const plugin = new KanbanBasesViewPlugin(makeApp(), {} as any);
 		plugin.loadData = async () => storedData;
 
 		let capturedLegacyData: any = undefined;

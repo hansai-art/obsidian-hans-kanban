@@ -1,5 +1,7 @@
 import { Plugin } from 'obsidian';
 import { HOVER_LINK_SOURCE_ID } from './constants.ts';
+import { createDemoBoard, DemoPromptModal } from './demo.ts';
+import { t } from './i18n/index.ts';
 import { KanbanView, type LegacyData, isRecord, isColumnOrders, isColumnColors } from './kanbanView.ts';
 
 export const KANBAN_VIEW_TYPE = 'hans-kanban-view';
@@ -59,6 +61,28 @@ export default class KanbanBasesViewPlugin extends Plugin {
 			},
 			options: KanbanView.getViewOptions,
 		});
+
+		// One-click sample board, always available from the command palette.
+		this.addCommand({
+			id: 'create-demo-board',
+			name: t('command.createDemo'),
+			callback: () => {
+				void createDemoBoard(this.app);
+			},
+		});
+
+		// First run after install: offer the demo board once. We merge the flag
+		// into existing data so any not-yet-migrated legacy column state survives,
+		// and record it before showing the modal so it never nags twice.
+		const data = isRecord(raw) ? raw : {};
+		if (!data.demoPrompted) {
+			await this.saveData({ ...data, demoPrompted: true });
+			this.app.workspace.onLayoutReady(() => {
+				new DemoPromptModal(this.app, () => {
+					void createDemoBoard(this.app);
+				}).open();
+			});
+		}
 	}
 
 	onunload() {

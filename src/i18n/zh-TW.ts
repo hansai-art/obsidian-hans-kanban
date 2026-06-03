@@ -40,4 +40,14 @@ export const zhTW: Record<StringKey, string> = {
 	'quickAdd.add': '新增',
 	'quickAdd.addCardTo': '新增卡片到',
 	'quickAdd.folderNotFound': '找不到快速新增資料夾：',
+
+	'command.createDemo': '建立範例看板',
+	'demo.promptTitle': '👋 歡迎使用 Hans Kanban',
+	'demo.promptBody':
+		'要不要先建立一個範例看板？裡面有可以拖曳、可以切換狀態的彩色卡片，讓你立刻看到效果。不會動到你 vault 裡的其他東西。',
+	'demo.create': '建立範例看板',
+	'demo.skip': '先不用',
+	'demo.created': '範例看板已建立，拖一張卡片或切換它的狀態試試看。',
+	'demo.exists': '範例看板已經存在，已經幫你開啟。',
+	'demo.failed': '無法建立範例看板。',
 };
