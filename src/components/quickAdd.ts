@@ -2,6 +2,7 @@ import type { App, BasesPropertyId, EventRef, TFile } from 'obsidian';
 import { Notice, normalizePath, parsePropertyId, setIcon } from 'obsidian';
 import { QuickAddModal } from '../quickAddModal.ts';
 import { CSS_CLASSES, UNCATEGORIZED_LABEL } from '../constants.ts';
+import { t } from '../i18n/index.ts';
 
 export interface QuickAddCtx {
 	app: App;
@@ -152,29 +153,29 @@ export async function createQuickAddCard(
 ): Promise<void> {
 	const baseFileName = sanitizeBaseFileName(title);
 	if (!baseFileName) {
-		new Notice('Enter a card title.');
+		new Notice(t('quickAdd.enterTitle'));
 		return;
 	}
 
 	const columnPropertyName = getWritableFrontmatterPropertyName(ctx.prefsPropertyId);
 	if (!columnPropertyName) {
-		new Notice('Quick add needs a writable note property for columns.');
+		new Notice(t('quickAdd.needColumnProp'));
 		return;
 	}
 
 	const swimlanePropertyName = swimlaneValue ? getWritableFrontmatterPropertyName(ctx.prefsSwimlanePropertyId) : null;
 	if (swimlaneValue && !swimlanePropertyName) {
-		new Notice('Quick add needs a writable note property for swimlanes.');
+		new Notice(t('quickAdd.needSwimlaneProp'));
 		return;
 	}
 
 	const targetFolder = ctx.quickAddFolder;
 	if (!targetFolder) {
-		new Notice('Quick add requires a folder to be configured.');
+		new Notice(t('quickAdd.needFolder'));
 		return;
 	}
 	if (!ctx.app?.vault.getFolderByPath(targetFolder)) {
-		new Notice(`Quick add folder not found: ${targetFolder}`);
+		new Notice(`${t('quickAdd.folderNotFound')} ${targetFolder}`);
 		return;
 	}
 	const fileNameToCreate = normalizePath(`${targetFolder}/${baseFileName}`);
@@ -202,7 +203,7 @@ export async function createQuickAddCard(
 		await ensureCreatedCardInFolder(ctx.app, createdFilePaths, createdFilePromise, baseFileName, targetFolder);
 	} catch (error) {
 		console.error('Error creating kanban card:', error);
-		new Notice('Could not create card.');
+		new Notice(t('quickAdd.createFailed'));
 	}
 }
 

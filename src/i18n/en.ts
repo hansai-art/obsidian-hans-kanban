@@ -1,0 +1,38 @@
+/** English strings (fallback locale). */
+export const en = {
+	'option.groupBy': 'Group by',
+	'option.groupBy.placeholder': 'Select property',
+	'option.swimlaneBy': 'Swimlane by',
+	'option.swimlaneBy.placeholder': 'Optional: horizontal grouping',
+	'option.quickAddFolder': 'Add card to column folder',
+	'option.quickAddFolder.placeholder': 'Required for + button',
+	'option.cardTitle': 'Card title property',
+	'option.cardTitle.placeholder': 'Default: file name',
+	'option.imageProperty': 'Image property',
+	'option.imageProperty.placeholder': 'Optional: image link property',
+	'option.imageFit': 'Image fit',
+	'option.imageFit.cover': 'Cover',
+	'option.imageFit.contain': 'Contain',
+	'option.imageAspectRatio': 'Image aspect ratio',
+	'option.wrapPropertyValues': 'Wrap property values',
+
+	'label.uncategorized': 'Uncategorized',
+	'label.noColor': 'No color',
+	'notice.sortedCardOrder':
+		'⚠️ Sort is active. Clear it to manually reorder cards within a column.',
+	'empty.noEntries': 'No entries found. Add some notes to your base.',
+	'empty.noProperties': 'No properties found in entries.',
+
+	'quickAdd.enterTitle': 'Enter a card title.',
+	'quickAdd.needColumnProp': 'Quick add needs a writable note property for columns.',
+	'quickAdd.needSwimlaneProp': 'Quick add needs a writable note property for swimlanes.',
+	'quickAdd.needFolder': 'Quick add requires a folder to be configured.',
+	'quickAdd.createFailed': 'Could not create card.',
+	'quickAdd.titlePlaceholder': 'Card title',
+	'quickAdd.cancel': 'Cancel',
+	'quickAdd.add': 'Add',
+	'quickAdd.addCardTo': 'Add card to',
+	'quickAdd.folderNotFound': 'Quick add folder not found:',
+} as const;
+
+export type StringKey = keyof typeof en;

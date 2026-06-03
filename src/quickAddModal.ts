@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import { Modal, TextComponent } from 'obsidian';
 import { CSS_CLASSES } from './constants.ts';
+import { t } from './i18n/index.ts';
 
 export interface QuickAddModalOptions {
 	columnValue: string;
@@ -21,20 +22,24 @@ export class QuickAddModal extends Modal {
 
 	onOpen(): void {
 		const { columnValue, swimlaneValue } = this.options;
-		this.setTitle(swimlaneValue ? `Add card to ${swimlaneValue} / ${columnValue}` : `Add card to ${columnValue}`);
+		this.setTitle(
+			swimlaneValue
+				? `${t('quickAdd.addCardTo')} ${swimlaneValue} / ${columnValue}`
+				: `${t('quickAdd.addCardTo')} ${columnValue}`,
+		);
 
 		const formEl = this.contentEl.createEl('form', { cls: CSS_CLASSES.QUICK_ADD_FORM });
 		this.input = new TextComponent(formEl);
-		this.input.setPlaceholder('Card title');
+		this.input.setPlaceholder(t('quickAdd.titlePlaceholder'));
 		this.input.inputEl.classList.add(CSS_CLASSES.QUICK_ADD_INPUT);
 
 		const actionsEl = formEl.createDiv({ cls: CSS_CLASSES.QUICK_ADD_ACTIONS });
 		const cancelBtn = actionsEl.createEl('button', {
-			text: 'Cancel',
+			text: t('quickAdd.cancel'),
 			attr: { type: 'button' },
 		});
 		const submitBtn = actionsEl.createEl('button', {
-			text: 'Add',
+			text: t('quickAdd.add'),
 			cls: 'mod-cta',
 			attr: { type: 'submit' },
 		});

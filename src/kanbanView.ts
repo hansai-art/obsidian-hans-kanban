@@ -45,6 +45,7 @@ import {
 } from './constants.ts';
 import type { DebouncedFn } from './utils/debounce.ts';
 import { debounce } from './utils/debounce.ts';
+import { t } from './i18n/index.ts';
 import { ensureGroupExists, normalizePropertyValue } from './utils/grouping.ts';
 
 export interface LegacyData {
@@ -1054,7 +1055,7 @@ export class KanbanView extends BasesView {
 		const noneSwatch = anchorEl.doc.createElement('div');
 		noneSwatch.className = `${CSS_CLASSES.COLUMN_COLOR_SWATCH} ${CSS_CLASSES.COLUMN_COLOR_NONE}`;
 		if (!currentColor) noneSwatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
-		noneSwatch.title = 'No color';
+		noneSwatch.title = t('label.noColor');
 		noneSwatch.addEventListener('click', () => {
 			this.applyColumnColor(columnEl, null);
 			delete this._prefs.columnColors[columnValue];
@@ -1443,46 +1444,46 @@ export class KanbanView extends BasesView {
 	static getViewOptions(this: void): ViewOption[] {
 		return [
 			{
-				displayName: 'Group by',
+				displayName: t('option.groupBy'),
 				type: 'property',
 				key: 'groupByProperty',
 				filter: (prop: string) => !prop.startsWith('file.'),
-				placeholder: 'Select property',
+				placeholder: t('option.groupBy.placeholder'),
 			},
 			{
-				displayName: 'Swimlane by',
+				displayName: t('option.swimlaneBy'),
 				type: 'property',
 				key: 'swimlaneByProperty',
 				filter: (prop: string) => !prop.startsWith('file.'),
-				placeholder: 'Optional: horizontal grouping',
+				placeholder: t('option.swimlaneBy.placeholder'),
 			},
 			{
-				displayName: 'Add card to column folder',
+				displayName: t('option.quickAddFolder'),
 				type: 'folder',
 				key: 'quickAddFolder',
-				placeholder: 'Required for + button',
+				placeholder: t('option.quickAddFolder.placeholder'),
 			},
 			{
-				displayName: 'Card title property',
+				displayName: t('option.cardTitle'),
 				type: 'property',
 				key: 'cardTitleProperty',
-				placeholder: 'Default: file name',
+				placeholder: t('option.cardTitle.placeholder'),
 			},
 			{
-				displayName: 'Image property',
+				displayName: t('option.imageProperty'),
 				type: 'property',
 				key: 'imageProperty',
-				placeholder: 'Optional: image link property',
+				placeholder: t('option.imageProperty.placeholder'),
 			},
 			{
-				displayName: 'Image fit',
+				displayName: t('option.imageFit'),
 				type: 'dropdown',
 				key: 'imageFit',
 				default: 'cover',
-				options: { cover: 'Cover', contain: 'Contain' },
+				options: { cover: t('option.imageFit.cover'), contain: t('option.imageFit.contain') },
 			},
 			{
-				displayName: 'Image aspect ratio',
+				displayName: t('option.imageAspectRatio'),
 				type: 'slider',
 				key: 'imageAspectRatio',
 				default: 0.5,
@@ -1491,7 +1492,7 @@ export class KanbanView extends BasesView {
 				step: 0.05,
 			},
 			{
-				displayName: 'Wrap property values',
+				displayName: t('option.wrapPropertyValues'),
 				type: 'toggle',
 				key: 'wrapPropertyValues',
 			},

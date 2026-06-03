@@ -2,8 +2,10 @@
  * Constants used throughout the Kanban view
  */
 
+import { t } from './i18n/index.ts';
+
 /** Label used for entries without a property value */
-export const UNCATEGORIZED_LABEL = 'Uncategorized';
+export const UNCATEGORIZED_LABEL = t('label.uncategorized');
 
 /** Source id registered with Obsidian's Page Preview core plugin */
 export const HOVER_LINK_SOURCE_ID = 'hans-kanban';
@@ -26,7 +28,7 @@ export type ColorName = (typeof COLOR_PALETTE)[number]['name'];
 export const SORTABLE_GROUP = 'obk-columns';
 
 /** Notice shown when Base sorting prevents manual card ordering */
-export const SORTED_CARD_ORDER_NOTICE = '⚠️ Sort is active. Clear it to manually reorder cards within a column.';
+export const SORTED_CARD_ORDER_NOTICE = t('notice.sortedCardOrder');
 
 /** Data attribute names */
 export const DATA_ATTRIBUTES = {
@@ -131,6 +133,6 @@ export const DEBOUNCE_DELAY = 50;
 
 /** Empty state messages */
 export const EMPTY_STATE_MESSAGES = {
-	NO_ENTRIES: 'No entries found. Add some notes to your base.',
-	NO_PROPERTIES: 'No properties found in entries.',
+	NO_ENTRIES: t('empty.noEntries'),
+	NO_PROPERTIES: t('empty.noProperties'),
 } as const;

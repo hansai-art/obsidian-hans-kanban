@@ -1,0 +1,37 @@
+import type { StringKey } from './en.ts';
+
+/** 繁體中文字串。 */
+export const zhTW: Record<StringKey, string> = {
+	'option.groupBy': '分欄依據',
+	'option.groupBy.placeholder': '選擇欄位',
+	'option.swimlaneBy': '泳道依據',
+	'option.swimlaneBy.placeholder': '選填：水平分組',
+	'option.quickAddFolder': '新卡片存放資料夾',
+	'option.quickAddFolder.placeholder': '+ 按鈕需要此設定',
+	'option.cardTitle': '卡片標題欄位',
+	'option.cardTitle.placeholder': '預設：檔名',
+	'option.imageProperty': '圖片欄位',
+	'option.imageProperty.placeholder': '選填：圖片連結欄位',
+	'option.imageFit': '圖片填充方式',
+	'option.imageFit.cover': '填滿',
+	'option.imageFit.contain': '完整顯示',
+	'option.imageAspectRatio': '圖片長寬比',
+	'option.wrapPropertyValues': '值換行顯示',
+
+	'label.uncategorized': '未分類',
+	'label.noColor': '無顏色',
+	'notice.sortedCardOrder': '⚠️ 排序已啟用。清除排序才能在欄內手動調整卡片順序。',
+	'empty.noEntries': '找不到項目。在你的 base 加入一些筆記。',
+	'empty.noProperties': '項目中找不到任何欄位。',
+
+	'quickAdd.enterTitle': '請輸入卡片標題。',
+	'quickAdd.needColumnProp': '快速新增需要一個可寫入的欄位作為分欄。',
+	'quickAdd.needSwimlaneProp': '快速新增需要一個可寫入的欄位作為泳道。',
+	'quickAdd.needFolder': '快速新增需要先設定資料夾。',
+	'quickAdd.createFailed': '無法建立卡片。',
+	'quickAdd.titlePlaceholder': '卡片標題',
+	'quickAdd.cancel': '取消',
+	'quickAdd.add': '新增',
+	'quickAdd.addCardTo': '新增卡片到',
+	'quickAdd.folderNotFound': '找不到快速新增資料夾：',
+};
