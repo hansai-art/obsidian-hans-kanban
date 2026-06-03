@@ -1,212 +1,94 @@
 # Hans Kanban
 
-A kanban-style drag-and-drop custom view for Obsidian Bases that organizes your notes into columns based on any property.
+繁體中文 ｜ [English below](#english)
 
-> **Fork notice.** Hans Kanban is a fork of [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License. It adds a Traditional Chinese UI, status-driven card colors with an on-card switcher, adjustable column widths, a minimal (zen) mode, and native bullet wrapping on top of the original. See [Acknowledgments](#acknowledgments).
+Obsidian Bases 的看板（Kanban）自訂視圖：把筆記依任一屬性分欄，拖放管理進度。
 
-## Demo
+> **Fork 說明**：Hans Kanban 是 [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban)（作者 I. Welch Canavan）的 fork，依 MIT 授權使用。在原版之上加了繁體中文介面、依狀態為卡片上色與卡上切換、可調欄寬、極簡模式與內建條列換行。原作者版權保留於 [LICENSE](LICENSE)。
 
-<video src="https://github.com/user-attachments/assets/fa75825a-3e8e-4b92-97b9-0216cabde08d" controls width="100%" title="Kanban Bases View Demo - Drag and drop with color themes"></video>
+## 這個 fork 新增的功能
 
-## Features
+- **繁體中文介面**：所有視圖文字繁中化（依 Obsidian 語系自動偵測，無對應時回退英文）
+- **卡片依狀態上色**：依任一屬性值為卡片上色（開頭是顏色 emoji 如 🔴/🟢 會自動對應，否則用穩定色盤），卡片上附下拉選單可直接切換該值並即時變色
+- **整欄套色**：欄位指定的顏色會延伸到外框與 body 淡色底，不只 header，整欄都反映該顏色
+- **可調欄寬**：全域欄寬滑桿 + 每欄右緣拖曳把手（雙擊還原），依 base 記憶
+- **極簡模式**：停靠在原生 Bases 工具列的切換鈕，隱藏卡片屬性標籤，畫面更乾淨
+- **條列自動換行**：長條列屬性值原生換行，不需額外 CSS snippet
+
+## 安裝（透過 BRAT）
+
+本外掛目前以 GitHub Release 發布，用 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 安裝即可，並可隨新版自動更新：
+
+1. 在 Obsidian 社群外掛安裝並啟用 **BRAT**
+2. BRAT 指令：`Add a beta plugin for testing`
+3. 貼上：`hansai-art/obsidian-hans-kanban`
+4. 安裝後在「設定 → 第三方外掛」啟用 **Hans Kanban**
+
+手動安裝：到 [Releases](https://github.com/hansai-art/obsidian-hans-kanban/releases) 下載 `main.js`、`manifest.json`、`styles.css`，放到 vault 的 `.obsidian/plugins/hans-kanban/`，重新載入並啟用。
+
+## 使用
+
+1. 開啟或建立一個 Base，新增一個視圖並選 **Hans Kanban**
+2. 在 **Group by** 選要分欄的屬性（例如「狀態」），筆記會依該屬性值自動分欄
+3. 拖放卡片即可更新該屬性值；沒有值的筆記會集中在「未分類」欄
+4. 想讓卡片依狀態上色：在 **Card color** 選對應屬性；用 **Card color order** 指定完整選項與順序
+5. 拖曳欄位右緣調整單欄寬度，或用欄寬滑桿一次調整全部
+6. 點工具列「極簡」鈕隱藏卡片屬性標籤
+
+---
+
+## English
+
+A kanban-style, drag-and-drop custom view for Obsidian Bases that organizes notes into columns by any property.
+
+> **Fork notice.** Hans Kanban is a fork of [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License. It adds a Traditional Chinese UI, status-driven card colors with an on-card switcher, adjustable column widths, a minimal (zen) mode, and native bullet wrapping on top of the original. The original copyright is retained in [LICENSE](LICENSE).
 
 ### Added in this fork
 
 - **Traditional Chinese UI**: All view strings are localized (zh-TW) with English fallback, detected from Obsidian's language setting
-- **Card Color by Status**: Tint cards by any property's value (leading color emoji like 🔴/🟢 maps automatically, otherwise a stable palette), with an on-card dropdown to switch the value and recolor instantly
-- **Column Color Throughout**: A column's assigned color carries past the header to its outline and a soft body wash, so the whole column reads as that color
-- **Adjustable Column Width**: A global width slider plus a per-column drag handle (double-click to reset), persisted per base
-- **Minimal (Zen) Mode**: A toggle docked in the native Bases toolbar that hides per-card property labels for a cleaner board
-- **Native Bullet Wrapping**: Long bulleted property values wrap cleanly without a custom CSS snippet
+- **Card color by status**: Tint cards by any property's value (a leading color emoji like 🔴/🟢 maps automatically, otherwise a stable palette), with an on-card dropdown to switch the value and recolor instantly
+- **Column color throughout**: A column's assigned color carries past the header to its outline and a soft body wash, so the whole column reads as that color
+- **Adjustable column width**: A global width slider plus a per-column drag handle (double-click to reset), persisted per base
+- **Minimal (zen) mode**: A toggle docked in the native Bases toolbar that hides per-card property labels for a cleaner board
+- **Native bullet wrapping**: Long bulleted property values wrap cleanly without a custom CSS snippet
 
-### From the original plugin
+### Installation (via BRAT)
 
-- **Dynamic Column Generation**: Select any property from your base to generate kanban columns automatically
-- **Drag and Drop**: Move cards between columns with smooth animations
-- **Quick Add Buttons**: Create new cards directly from a column's `+` button with the column value, and swimlane value when used, filled in automatically
-- **Column Reordering**: Drag columns by their handle (⋮⋮) to reorder them to your preference
-- **Swimlanes**: Optionally group the board into horizontal lanes using a second property
-- **Column Color Themes**: Assign colors to columns using the color picker button for visual categorization
-- **Column Order Persistence**: Your column order is saved per property and persists across sessions
-- **Property Selection**: Choose which property determines your columns (e.g., "Status", "Priority", "Category")
-- **Uncategorized Entries**: Notes without a value for the selected property are automatically grouped in an "Uncategorized" column
-- **Property Display**: Selected properties are shown on each card for at-a-glance context
-- **Custom Card Titles**: Display a frontmatter property as the card title instead of the file name — useful when files share a common name (e.g., `README.md`) across folders
-- **Cover Images**: Show a cover image on each card by picking a frontmatter property — mirrors Obsidian's native Cards view *Image property* with matching fit (cover/contain) and aspect-ratio controls, so one frontmatter field works for both views
-- **Property Word Wrap**: Toggle property text wrapping on cards to handle long property values
-- **Click to Open**: Click any card to open the corresponding note (Cmd/Ctrl+click to open in new tab)
-- **Visual Feedback**: Clear visual indicators during drag operations
-- **Responsive Design**: Works well on different screen sizes
+This plugin is distributed via GitHub Releases. Install it with [BRAT](https://github.com/TfTHacker/obsidian42-brat) to get automatic updates:
 
-## Installation
+1. Install and enable **BRAT** from the community plugins
+2. Run the BRAT command `Add a beta plugin for testing`
+3. Paste `hansai-art/obsidian-hans-kanban`
+4. Enable **Hans Kanban** under Settings → Community plugins
 
-### Manual Installation
+Manual install: download `main.js`, `manifest.json`, and `styles.css` from the [Releases](https://github.com/hansai-art/obsidian-hans-kanban/releases) page into your vault's `.obsidian/plugins/hans-kanban/`, then reload and enable.
 
-1. Download the latest release from the [Releases](../../releases) page
-2. Extract the plugin folder to your vault's `.obsidian/plugins/` directory
-3. Reload Obsidian
-4. Enable the plugin in Settings → Community plugins
+### Usage
 
-### Development Installation
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/hansai-art/obsidian-hans-kanban.git
-   cd obsidian-hans-kanban
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Build the plugin:
-   ```bash
-   npm run build
-   ```
-
-4. Link or copy the plugin folder to your vault's `.obsidian/plugins/` directory
-
-## Usage
-
-1. Create or open a Base in Obsidian
-2. Add a view and select "Kanban" as the view type
-3. Select the property you want to use for columns (e.g., "Status") in the "Group by" option
-4. Your notes will be automatically organized into columns based on the selected property's values
-5. Drag cards between columns to update the property value
-6. Optionally, set "Add card to column folder" to a folder path — this enables a `+` button in each column header for quickly creating cards with that column's value pre-filled
-7. Click any card to open the corresponding note (Cmd/Ctrl+click to open in new tab)
-8. Drag columns by their handle (⋮⋮) to reorder them - your preferred order will be saved
-9. Optionally, select a property in "Swimlane by" to split the board into horizontal lanes
-10. Optionally, select a property in "Card title property" to display that property's value as each card's title instead of the file name
-
-### Example
-
-If your base has a "Status" property with values "To Do", "Doing", and "Done":
-- Select "Status" in the "Group by" dropdown
-- Three columns will appear: "To Do", "Doing", and "Done" (plus an "Uncategorized" column for notes without a status)
-- Drag cards between columns to change their status
-- If "Add card to column folder" is configured, click the `+` button to create a new note with that status in that folder
-- Click any card to open the note (Cmd/Ctrl+click to open in new tab)
-- Drag columns by their handle to reorder them - your order preference will be remembered
-
-If your base also has a "Priority" property with values "High", "Medium", and "Low":
-- Select "Status" in the "Group by" dropdown
-- Select "Priority" in the "Swimlane by" dropdown
-- The board will render one horizontal lane for each priority, and each lane will contain the same status columns
-- Drag cards sideways to change their status, or drag them to another lane to change their priority
-- Click a `+` button inside a lane to create a new note with both its status and priority filled in
-- Drag lane headers to reorder lanes, use the lane toggle to collapse or expand a lane, and drag any column header to reorder that column across all lanes
-- Notes without a value for the swimlane property appear in an "Uncategorized" lane
-- Leave "Swimlane by" unset to use the original single-axis kanban layout
-
-If your project folders each contain a `README.md` with a `title` property:
-- Select `title` in the "Card title property" dropdown
-- Cards will display the `title` property value instead of "README"
-- If a note is missing the property, the file name is used as a fallback
-
-If your notes have a frontmatter property pointing at a cover image (e.g., `cover: "[[book-cover.jpg]]"` or `cover: "https://example.com/poster.jpg"`):
-- Select that property in the "Image property" dropdown
-- Each card gets a cover image above the title
-- Use "Image fit" to choose between Cover (crop to fill) and Contain (letterbox)
-- Drag the "Image aspect ratio" slider to size the cover — wide banner on the left, tall portrait on the right
-- The same property value also works in Obsidian's built-in Cards view, so the two views stay in sync
+1. Open or create a Base, add a view, and select **Hans Kanban**
+2. Pick the column property under **Group by** (e.g. "Status"); notes are grouped into columns by that property's values
+3. Drag cards between columns to update the value; notes without a value land in an "Uncategorized" column
+4. To color cards by status, choose the property under **Card color**, and use **Card color order** to define the full set and order of values
+5. Drag a column's right edge to resize it, or use the width slider to adjust them all at once
+6. Click the "極簡" (Minimal) toggle in the toolbar to hide per-card property labels
 
 ## Development
 
-### Prerequisites
-
-- Node.js (v24)
-- npm
-
-### Building
-
 ```bash
-npm run build
+npm install      # install dependencies
+npm run build    # type-check + build to dist/
+npm run dev       # watch and rebuild
+npm test         # run the test suite
+npm run lint     # eslint
 ```
 
-### Development Mode
-
-```bash
-npm run dev
-```
-
-This will watch for changes and rebuild automatically.
-
-### Testing
-
-```bash
-npm test
-```
-
-### Type Checking
-
-```bash
-npm run typecheck
-```
-
-### Linting and Formatting
-
-This project uses [ESLint](https://eslint.org/) for linting and [Biome](https://biomejs.dev/) for formatting. They are intentionally kept separate.
-
-**Lint** (reports rule violations):
-```bash
-npm run lint
-```
-
-**Lint with auto-fix**:
-```bash
-npm run lint:fix
-```
-
-**Format** (rewrites files):
-```bash
-npm run format
-```
-
-**Check formatting** (exits non-zero if unformatted; used by CI and the pre-commit hook):
-```bash
-npm run format:check
-```
-
-### Technical notes
-
-- The plugin uses the **`.obk-`** CSS class prefix (Obsidian Bases Kanban) for all view UI classes to avoid collisions with other plugins and themes.
-
-## Releasing
-
-### Creating a Release
-
-1. **Update version**: Manually update the version in `manifest.json` following [Semantic Versioning](https://semver.org/).
-
-2. **Update package.json**: Ensure the version in `package.json` matches the version in `manifest.json` (the CI workflow will verify this).
-
-3. **Update versions.json**: Add an entry mapping the new version to the correct `minAppVersion` in `versions.json`.
-
-4. **Push to main**: Push your changes to the `main` branch. The GitHub Actions workflow will automatically:
-   - Run tests and verify that `manifest.json` and `package.json` versions match
-   - Verify that the version exists in `versions.json`
-   - Build the plugin (runs `npm run build`)
-   - Extract the version from the built `dist/manifest.json`
-   - Create a git tag matching the version exactly (no `v` prefix) if it doesn't already exist
-   - Create a GitHub release and upload `main.js`, `manifest.json`, and `styles.css` as release assets
-
-   Note: The release workflow only runs on pushes to `main` (not on pull requests). You can also trigger it manually from the GitHub Actions tab.
-
-5. **Submit to Obsidian Community Plugins** (first release only):
-   - Follow the [Obsidian plugin submission guidelines](https://docs.obsidian.md/Plugins/Releasing/Submit+your+plugin)
-   - Submit a PR to the [obsidian-releases](https://github.com/obsidianmd/obsidian-releases) repository
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+The plugin uses the `.obk-` CSS class prefix (Obsidian Bases Kanban) for all view UI classes to avoid collisions with other plugins and themes.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- Forked from [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License. The original copyright is retained in [LICENSE](LICENSE).
-- Built with [SortableJS](https://sortablejs.github.io/Sortable/) for drag-and-drop functionality
-- Inspired by the need for better task management in Obsidian Bases
+- Forked from [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License.
+- Built with [SortableJS](https://sortablejs.github.io/Sortable/) for drag-and-drop.
