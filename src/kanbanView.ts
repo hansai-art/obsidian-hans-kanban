@@ -31,6 +31,7 @@ import {
 import type { TFile } from 'obsidian';
 import Sortable from 'sortablejs';
 import {
+	COLOR_NAME_TO_EMOJI,
 	COLOR_PALETTE,
 	CSS_CLASSES,
 	DATA_ATTRIBUTES,
@@ -1364,17 +1365,42 @@ export class KanbanView extends BasesView {
 			return;
 		}
 		const propertyName = parsed.name;
+		// When setting the card-color property to a value that has no leading
+		// color emoji, prepend the resolved palette emoji so the value carries its
+		// color everywhere (kanban card, table, and Obsidian's native property
+		// editor) without the user having to type the emoji manually.
+		const toWrite = value !== '' && propertyId === this.cardColorPropertyId ? this._withColorEmoji(value) : value;
 		try {
 			await this.app.fileManager.processFrontMatter(entry.file, (frontmatter: Record<string, unknown>) => {
 				if (value === '') {
 					delete frontmatter[propertyName];
 				} else {
-					frontmatter[propertyName] = value;
+					frontmatter[propertyName] = toWrite;
 				}
 			});
 		} catch (error) {
 			console.error('Error updating card property:', error);
 		}
+	}
+
+	/**
+	 * Return the value prefixed with its resolved palette color emoji (e.g.
+	 * "有嗎" → "🟣 有嗎"). If the value already begins with a recognized color
+	 * emoji it is returned unchanged. Resolution mirrors _computeCardColors:
+	 * user override wins, else palette-by-index over the current value list.
+	 */
+	private _withColorEmoji(value: string): string {
+		const leadEmoji = [...value][0] ?? '';
+		if (EMOJI_COLOR_MAP[leadEmoji]) return value;
+		const override = this._cardColorPrefs[value];
+		let colorName = override;
+		if (!colorName) {
+			let index = this._cardColorValues.indexOf(value);
+			if (index < 0) index = this._cardColorValues.length;
+			colorName = COLOR_PALETTE[index % COLOR_PALETTE.length].name;
+		}
+		const emoji = COLOR_NAME_TO_EMOJI[colorName];
+		return emoji ? `${emoji} ${value}` : value;
 	}
 
 	private createCard(entry: BasesEntry): HTMLElement {

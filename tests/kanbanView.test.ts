@@ -3,6 +3,8 @@ import { beforeEach, describe, test } from 'node:test';
 import { Notice } from 'obsidian';
 import type { BasesPropertyId } from 'obsidian';
 import {
+	COLOR_NAME_TO_EMOJI,
+	COLOR_PALETTE,
 	CSS_CLASSES,
 	HOVER_LINK_SOURCE_ID,
 	SORTABLE_CONFIG,
@@ -4060,5 +4062,59 @@ describe('Card Color - auto-color and custom override', () => {
 		(popover.querySelector('.obk-column-color-none') as HTMLElement).click();
 
 		assert.strictEqual((view as any)._cardColorPrefs['To Do'], undefined, 'override should be cleared');
+	});
+
+	const KNOWN_EMOJIS = Object.values(COLOR_NAME_TO_EMOJI);
+
+	test('setCardProperty auto-prepends a palette emoji for an emoji-less value', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		await (view as any).setCardProperty({ file: {} } as any, PROPERTY_STATUS, 'Backlog');
+
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 1, 'processFrontMatter should run once');
+		const fm: Record<string, unknown> = {};
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		const written = fm.status as string;
+		assert.ok(written.endsWith(' Backlog'), `expected "... Backlog", got "${written}"`);
+		assert.ok(KNOWN_EMOJIS.includes([...written][0]), `expected a leading color emoji, got "${written}"`);
+	});
+
+	test('setCardProperty leaves a value that already carries a color emoji untouched', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		await (view as any).setCardProperty({ file: {} } as any, PROPERTY_STATUS, '🔴 緊急');
+
+		const fm: Record<string, unknown> = {};
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(fm.status, '🔴 緊急', 'value with a leading color emoji must not be re-prefixed');
+	});
+
+	test('setCardProperty honours a custom override when choosing the emoji', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+		(view as any)._cardColorPrefs['Backlog'] = 'purple';
+
+		await (view as any).setCardProperty({ file: {} } as any, PROPERTY_STATUS, 'Backlog');
+
+		const fm: Record<string, unknown> = {};
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(
+			fm.status,
+			`${COLOR_PALETTE.find((c) => c.name === 'purple') ? COLOR_NAME_TO_EMOJI.purple : ''} Backlog`,
+		);
+		assert.strictEqual(fm.status, '🟣 Backlog', 'override colour should drive the prepended emoji');
+	});
+
+	test('setCardProperty does not touch non-color properties', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		await (view as any).setCardProperty({ file: {} } as any, 'note.other' as any, 'Backlog');
+
+		const fm: Record<string, unknown> = {};
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(fm.other, 'Backlog', 'non-color property values must be written verbatim');
 	});
 });

@@ -40,6 +40,18 @@ export const EMOJI_COLOR_MAP: Record<string, ColorName> = {
 	'🩷': 'pink',
 };
 
+/** Inverse of EMOJI_COLOR_MAP: palette color name → leading dot emoji. */
+export const COLOR_NAME_TO_EMOJI: Record<string, string> = {
+	red: '🔴',
+	orange: '🟠',
+	yellow: '🟡',
+	green: '🟢',
+	blue: '🔵',
+	purple: '🟣',
+	cyan: '🩵',
+	pink: '🩷',
+};
+
 /** Sortable.js group name for kanban columns */
 export const SORTABLE_GROUP = 'obk-columns';
 
