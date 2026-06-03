@@ -2,87 +2,119 @@
 
 繁體中文 ｜ [English below](#english)
 
-Obsidian Bases 的看板（Kanban）自訂視圖：把筆記依任一屬性分欄，拖放管理進度。
+把 Obsidian 的筆記變成一塊「看板」：像便利貼一樣分欄排列，拖一拖就能更新進度。適合管理影片製作、待辦事項、寫作進度、任何「有不同階段」的工作。
 
-> **Fork 說明**：Hans Kanban 是 [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban)（作者 I. Welch Canavan）的 fork，依 MIT 授權使用。在原版之上加了繁體中文介面、依狀態為卡片上色與卡上切換、可調欄寬、極簡模式與內建條列換行。原作者版權保留於 [LICENSE](LICENSE)。
+> **這是 fork 版本**：Hans Kanban 改自 [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban)（作者 I. Welch Canavan，MIT 授權），加上繁體中文介面、卡片依狀態上色與切換、可調欄寬、極簡模式等功能。原作者版權保留於 [LICENSE](LICENSE)。
 
-## 這個 fork 新增的功能
+---
 
-- **繁體中文介面**：所有視圖文字繁中化（依 Obsidian 語系自動偵測，無對應時回退英文）
-- **卡片依狀態上色**：依任一屬性值為卡片上色（開頭是顏色 emoji 如 🔴/🟢 會自動對應，否則用穩定色盤），卡片上附下拉選單可直接切換該值並即時變色
-- **整欄套色**：欄位指定的顏色會延伸到外框與 body 淡色底，不只 header，整欄都反映該顏色
-- **可調欄寬**：全域欄寬滑桿 + 每欄右緣拖曳把手（雙擊還原），依 base 記憶
-- **極簡模式**：停靠在原生 Bases 工具列的切換鈕，隱藏卡片屬性標籤，畫面更乾淨
-- **條列自動換行**：長條列屬性值原生換行，不需額外 CSS snippet
+## 新手教學：從零開始（跟著做就會）
 
-## 安裝（透過 BRAT）
+完全沒用過也沒關係，照下面四步走一遍就上手了。
 
-本外掛目前以 GitHub Release 發布，用 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 安裝即可，並可隨新版自動更新：
+### 第 1 步：先裝一個叫 BRAT 的小工具
 
-1. 在 Obsidian 社群外掛安裝並啟用 **BRAT**
-2. BRAT 指令：`Add a beta plugin for testing`
-3. 貼上：`hansai-art/obsidian-hans-kanban`
-4. 安裝後在「設定 → 第三方外掛」啟用 **Hans Kanban**
+這個外掛還沒上架官方商店，要透過 **BRAT** 來安裝（BRAT 是社群常用的安裝小幫手，一次裝好以後就能自動更新）。
 
-手動安裝：到 [Releases](https://github.com/hansai-art/obsidian-hans-kanban/releases) 下載 `main.js`、`manifest.json`、`styles.css`，放到 vault 的 `.obsidian/plugins/hans-kanban/`，重新載入並啟用。
+1. 打開 Obsidian → 左下角齒輪 **設定**
+2. 點 **第三方外掛**（Community plugins）→ **瀏覽**（Browse）
+3. 搜尋 **BRAT** → 安裝 → 啟用
 
-## 使用
+### 第 2 步：用 BRAT 安裝 Hans Kanban
 
-1. 開啟或建立一個 Base，新增一個視圖並選 **Hans Kanban**
-2. 在 **Group by** 選要分欄的屬性（例如「狀態」），筆記會依該屬性值自動分欄
-3. 拖放卡片即可更新該屬性值；沒有值的筆記會集中在「未分類」欄
-4. 想讓卡片依狀態上色：在 **Card color** 選對應屬性；用 **Card color order** 指定完整選項與順序
-5. 拖曳欄位右緣調整單欄寬度，或用欄寬滑桿一次調整全部
-6. 點工具列「極簡」鈕隱藏卡片屬性標籤
+1. 按 `Cmd/Ctrl + P` 打開指令面板
+2. 輸入並選擇：**BRAT: Add a beta plugin for testing**
+3. 在欄位貼上這一行網址：
+   ```
+   hansai-art/obsidian-hans-kanban
+   ```
+4. 按確定，BRAT 會自動下載安裝
+5. 回到 **設定 → 第三方外掛**，把 **Hans Kanban** 打開（啟用）
+
+✅ 裝好了。接下來做你的第一塊看板。
+
+### 第 3 步：準備幾則「有狀態」的筆記
+
+看板要能分欄，每則筆記得有一個欄位告訴它「現在在哪一欄」。最簡單的做法是在筆記最上面加一段「屬性」。
+
+新建一則筆記，最上面貼這幾行（兩條 `---` 中間就是屬性區）：
+
+```
+---
+狀態: 待辦
+---
+```
+
+下面再寫筆記內容就好。多做幾則，把 `狀態` 填成不同值，例如 `待辦`、`進行中`、`完成`。
+
+> 小提醒：`狀態` 是欄位名稱，你也可以叫它 `階段`、`status` 都行，等一下分欄會用到它。
+
+### 第 4 步：建立看板，看著筆記自動分欄
+
+1. 新建一個 **Base**：指令面板輸入 **Create new base**，或在資料夾按右鍵新增
+2. 在 Base 右上角加一個**視圖**，視圖類型選 **Hans Kanban**
+3. 在視圖設定的 **Group by（依此分欄）** 選你剛剛的 `狀態`
+4. 畫面就會出現「待辦 / 進行中 / 完成」三欄，你的筆記各就各位
+
+🎉 完成！現在把卡片從「待辦」拖到「進行中」，那則筆記的 `狀態` 就自動改好了。
+
+---
+
+## 上手後的貼心功能
+
+- **幫卡片上顏色**：在視圖設定的 **Card color** 選 `狀態`，每一欄的卡片就會有對應顏色。若值的開頭放一個顏色圓點 emoji（例如 `🔴 待辦`、`🟢 完成`），會自動配上紅、綠等顏色。
+- **直接在卡片上換狀態**：卡片上有個小下拉選單，點一下就能換階段，顏色立刻跟著變，不用拖。
+- **整欄換色**：點欄位標題旁的小圓點可以指定該欄顏色，整欄（外框＋底色）都會跟著變。
+- **調整欄寬**：用滑桿一次調整全部欄寬，或拖某一欄的右邊界單獨調整（雙擊還原）。
+- **極簡模式**：工具列上的「極簡」鈕，一鍵把卡片上的屬性標籤藏起來，畫面更清爽。
 
 ---
 
 ## English
 
-A kanban-style, drag-and-drop custom view for Obsidian Bases that organizes notes into columns by any property.
+Turn your Obsidian notes into a kanban board: cards in columns you can drag between to update progress. Great for tracking video production, to-dos, writing, or anything with stages.
 
-> **Fork notice.** Hans Kanban is a fork of [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License. It adds a Traditional Chinese UI, status-driven card colors with an on-card switcher, adjustable column widths, a minimal (zen) mode, and native bullet wrapping on top of the original. The original copyright is retained in [LICENSE](LICENSE).
+> **This is a fork** of [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan (MIT), adding a Traditional Chinese UI, status-based card colors and switching, adjustable column widths, and a minimal mode. Original copyright is kept in [LICENSE](LICENSE).
 
-### Added in this fork
+### Quick start (beginner friendly)
 
-- **Traditional Chinese UI**: All view strings are localized (zh-TW) with English fallback, detected from Obsidian's language setting
-- **Card color by status**: Tint cards by any property's value (a leading color emoji like 🔴/🟢 maps automatically, otherwise a stable palette), with an on-card dropdown to switch the value and recolor instantly
-- **Column color throughout**: A column's assigned color carries past the header to its outline and a soft body wash, so the whole column reads as that color
-- **Adjustable column width**: A global width slider plus a per-column drag handle (double-click to reset), persisted per base
-- **Minimal (zen) mode**: A toggle docked in the native Bases toolbar that hides per-card property labels for a cleaner board
-- **Native bullet wrapping**: Long bulleted property values wrap cleanly without a custom CSS snippet
+**1. Install BRAT** (a small helper that installs and auto-updates plugins not yet in the store):
+Settings → Community plugins → Browse → search **BRAT** → Install → Enable.
 
-### Installation (via BRAT)
+**2. Install Hans Kanban via BRAT:**
+Command palette (`Cmd/Ctrl + P`) → **BRAT: Add a beta plugin for testing** → paste `hansai-art/obsidian-hans-kanban` → confirm. Then enable **Hans Kanban** in Settings → Community plugins.
 
-This plugin is distributed via GitHub Releases. Install it with [BRAT](https://github.com/TfTHacker/obsidian42-brat) to get automatic updates:
+**3. Give a few notes a status property.** Add this to the top of a note (the part between the two `---` lines):
 
-1. Install and enable **BRAT** from the community plugins
-2. Run the BRAT command `Add a beta plugin for testing`
-3. Paste `hansai-art/obsidian-hans-kanban`
-4. Enable **Hans Kanban** under Settings → Community plugins
+```
+---
+status: To Do
+---
+```
 
-Manual install: download `main.js`, `manifest.json`, and `styles.css` from the [Releases](https://github.com/hansai-art/obsidian-hans-kanban/releases) page into your vault's `.obsidian/plugins/hans-kanban/`, then reload and enable.
+Make a few notes with values like `To Do`, `Doing`, `Done`.
 
-### Usage
+**4. Build the board:** Create a Base → add a view → pick **Hans Kanban** as the type → set **Group by** to `status`. Columns appear automatically. Drag a card to another column and its `status` updates.
 
-1. Open or create a Base, add a view, and select **Hans Kanban**
-2. Pick the column property under **Group by** (e.g. "Status"); notes are grouped into columns by that property's values
-3. Drag cards between columns to update the value; notes without a value land in an "Uncategorized" column
-4. To color cards by status, choose the property under **Card color**, and use **Card color order** to define the full set and order of values
-5. Drag a column's right edge to resize it, or use the width slider to adjust them all at once
-6. Click the "極簡" (Minimal) toggle in the toolbar to hide per-card property labels
+### Nice extras
+
+- **Card color**: set **Card color** to your status property; a leading color emoji (🔴/🟢) maps to that color automatically, otherwise a stable palette is used.
+- **On-card switch**: a dropdown on each card switches the value and recolors instantly.
+- **Whole-column color**: pick a color from the dot next to a column title; the outline and body tint to match.
+- **Column width**: a global slider, plus a per-column drag handle (double-click to reset).
+- **Minimal mode**: a toolbar toggle hides per-card property labels for a cleaner board.
 
 ## Development
 
 ```bash
 npm install      # install dependencies
 npm run build    # type-check + build to dist/
-npm run dev       # watch and rebuild
+npm run dev      # watch and rebuild
 npm test         # run the test suite
 npm run lint     # eslint
 ```
 
-The plugin uses the `.obk-` CSS class prefix (Obsidian Bases Kanban) for all view UI classes to avoid collisions with other plugins and themes.
+The plugin uses the `.obk-` CSS class prefix to avoid collisions with other plugins and themes.
 
 ## License
 
@@ -90,5 +122,5 @@ MIT. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- Forked from [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License.
+- Forked from [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan (MIT).
 - Built with [SortableJS](https://sortablejs.github.io/Sortable/) for drag-and-drop.
