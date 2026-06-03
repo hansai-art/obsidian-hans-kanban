@@ -52,7 +52,7 @@ export default class KanbanBasesViewPlugin extends Plugin {
 		});
 
 		this.registerBasesView(KANBAN_VIEW_TYPE, {
-			name: 'Hans 看板',
+			name: 'Hans Kanban',
 			icon: 'columns',
 			factory: (controller, scrollEl) => {
 				return new KanbanView(controller, scrollEl, legacyData);
