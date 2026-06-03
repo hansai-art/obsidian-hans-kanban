@@ -6,7 +6,7 @@
 export const UNCATEGORIZED_LABEL = 'Uncategorized';
 
 /** Source id registered with Obsidian's Page Preview core plugin */
-export const HOVER_LINK_SOURCE_ID = 'kanban-bases-view';
+export const HOVER_LINK_SOURCE_ID = 'hans-kanban';
 
 /** Color palette for column accents, using Obsidian design system variables */
 export const COLOR_PALETTE = [

@@ -1,10 +1,10 @@
 {
-	"id": "kanban-bases-view",
-	"name": "Kanban Bases View",
+	"id": "hans-kanban",
+	"name": "Hans 看板",
 	"version": "0.10.1",
 	"minAppVersion": "1.10.2",
-	"description": "A kanban-style drag-and-drop custom view for Bases.",
-	"author": "I. Welch Canavan",
-	"authorUrl": "https://welchcanavan.com",
+	"description": "中文化的 Bases 看板：卡片依欄位上色、卡片內下拉切換狀態、欄寬調整。Fork of Kanban Bases View by I. Welch Canavan (MIT).",
+	"author": "Hans Lin",
+	"authorUrl": "https://github.com/xiwcx/obsidian-bases-kanban",
 	"isDesktopOnly": false
 }

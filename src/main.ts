@@ -2,7 +2,7 @@ import { Plugin } from 'obsidian';
 import { HOVER_LINK_SOURCE_ID } from './constants.ts';
 import { KanbanView, type LegacyData, isRecord, isColumnOrders, isColumnColors } from './kanbanView.ts';
 
-export const KANBAN_VIEW_TYPE = 'kanban-view';
+export const KANBAN_VIEW_TYPE = 'hans-kanban-view';
 
 /**
  * Reads column order and color data previously stored in plugin.data.json
@@ -52,7 +52,7 @@ export default class KanbanBasesViewPlugin extends Plugin {
 		});
 
 		this.registerBasesView(KANBAN_VIEW_TYPE, {
-			name: 'Kanban',
+			name: 'Hans 看板',
 			icon: 'columns',
 			factory: (controller, scrollEl) => {
 				return new KanbanView(controller, scrollEl, legacyData);
