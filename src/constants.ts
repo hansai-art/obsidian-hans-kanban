@@ -24,6 +24,22 @@ export const COLOR_PALETTE = [
 
 export type ColorName = (typeof COLOR_PALETTE)[number]['name'];
 
+/**
+ * Leading color-emoji → palette color name. Lets a status value like
+ * "🔴 講義" map to its intuitive accent color without manual configuration.
+ * Values without a leading color emoji fall back to palette-by-index.
+ */
+export const EMOJI_COLOR_MAP: Record<string, ColorName> = {
+	'🔴': 'red',
+	'🟠': 'orange',
+	'🟡': 'yellow',
+	'🟢': 'green',
+	'🔵': 'blue',
+	'🟣': 'purple',
+	'🩵': 'cyan',
+	'🩷': 'pink',
+};
+
 /** Sortable.js group name for kanban columns */
 export const SORTABLE_GROUP = 'obk-columns';
 
@@ -84,6 +100,9 @@ export const CSS_CLASSES = {
 
 	// Card
 	CARD: 'obk-card',
+	CARD_COLORED: 'obk-card--colored',
+	CARD_STATUS: 'obk-card-status',
+	CARD_STATUS_SELECT: 'obk-card-status-select',
 	CARD_TITLE: 'obk-card-title',
 	CARD_PREVIEW: 'obk-card-preview',
 	CARD_COVER: 'obk-card-cover',

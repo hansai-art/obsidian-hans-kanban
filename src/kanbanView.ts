@@ -1,4 +1,4 @@
-import type { BasesEntry, BasesPropertyId, HoverPopover, QueryController, ViewOption } from 'obsidian';
+import type { BasesEntry, BasesPropertyId, BasesViewConfig, HoverPopover, QueryController, ViewOption } from 'obsidian';
 import { BasesView, Keymap, Notice, normalizePath, parsePropertyId } from 'obsidian';
 import {
 	createCard as createCardEl,
@@ -35,6 +35,7 @@ import {
 	CSS_CLASSES,
 	DATA_ATTRIBUTES,
 	DEBOUNCE_DELAY,
+	EMOJI_COLOR_MAP,
 	EMPTY_STATE_MESSAGES,
 	HOVER_LINK_SOURCE_ID,
 	SORTABLE_CONFIG,
@@ -99,6 +100,12 @@ export class KanbanView extends BasesView {
 	private swimlaneByPropertyId: BasesPropertyId | null = null;
 	private cardTitlePropertyId: BasesPropertyId | null = null;
 	private imagePropertyId: BasesPropertyId | null = null;
+	private cardColorPropertyId: BasesPropertyId | null = null;
+	private _lastCardColorPropertyId: BasesPropertyId | null = null;
+	private _lastCardColorOrderKey = '[]';
+	/** Per-render cache: distinct card-color values + value→css-color map. */
+	private _cardColorValues: string[] = [];
+	private _cardColorMap: Map<string, string> = new Map();
 	private _columnSortables: Map<string, Sortable> = new Map();
 	private _entryMap: Map<string, BasesEntry> = new Map();
 	private swimlaneSortable: Sortable | null = null;
@@ -212,6 +219,48 @@ export class KanbanView extends BasesView {
 		this.swimlaneByPropertyId = this.config.getAsPropertyId('swimlaneByProperty');
 		this.cardTitlePropertyId = this.config.getAsPropertyId('cardTitleProperty');
 		this.imagePropertyId = this.config.getAsPropertyId('imageProperty');
+		this.cardColorPropertyId = this.config.getAsPropertyId('cardColorProperty');
+	}
+
+	/**
+	 * Build the value→color map and distinct-value list for the card-color
+	 * property. Each distinct value gets a color: a leading color emoji wins
+	 * (🔴 → red), otherwise palette-by-sorted-index so colors stay stable.
+	 */
+	private _computeCardColors(entries: BasesEntry[]): void {
+		this._cardColorValues = [];
+		this._cardColorMap = new Map();
+		if (!this.cardColorPropertyId) return;
+
+		// Values actually present in the data.
+		const seen = new Set<string>();
+		for (const entry of entries) {
+			const value = entry.getValue(this.cardColorPropertyId);
+			if (!value) continue;
+			const raw = value.toString().trim();
+			if (!raw || seen.has(raw)) continue;
+			seen.add(raw);
+		}
+
+		// A user-configured ordered list (cardColorOrder) defines the full set of
+		// switcher options and their order/color. Any in-data value not listed is
+		// appended (sorted) so nothing is unselectable. With no config, fall back
+		// to the sorted in-data values.
+		const rawConfigured = this.config?.get('cardColorOrder');
+		const configured = Array.isArray(rawConfigured)
+			? rawConfigured.map((v) => String(v).trim()).filter((v) => v.length > 0)
+			: [];
+		const extras = [...seen].filter((v) => !configured.includes(v)).sort();
+		const values = configured.length > 0 ? [...configured, ...extras] : [...seen].sort();
+		this._cardColorValues = values;
+
+		values.forEach((value, index) => {
+			const leadEmoji = [...value][0] ?? '';
+			const emojiColor = EMOJI_COLOR_MAP[leadEmoji];
+			const colorName = emojiColor ?? COLOR_PALETTE[index % COLOR_PALETTE.length].name;
+			const paletteEntry = COLOR_PALETTE.find((c) => c.name === colorName);
+			if (paletteEntry) this._cardColorMap.set(value, paletteEntry.cssVar);
+		});
 	}
 
 	private triggerHoverPreview(linktext: string, sourcePath: string, event: MouseEvent, targetEl: HTMLElement): void {
@@ -391,6 +440,9 @@ export class KanbanView extends BasesView {
 			// Build path→entry lookup map for O(1) access in handleCardDrop
 			this._entryMap = new Map(entries.map((e: BasesEntry) => [e.file.path, e]));
 
+			// Distinct values + color map for the card-color / status property.
+			this._computeCardColors(entries);
+
 			// Group entries — 2D when swimlanes are active, 1D otherwise. The
 			// column-axis preference logic (order, colors, new-value detection)
 			// runs against the union of columns across all lanes, so a single
@@ -462,6 +514,15 @@ export class KanbanView extends BasesView {
 			const imagePropertyChanged = currentImagePropertyId !== this._lastImagePropertyId;
 			this._lastImagePropertyId = currentImagePropertyId;
 
+			const currentCardColorPropertyId = this.cardColorPropertyId;
+			const cardColorPropertyChanged = currentCardColorPropertyId !== this._lastCardColorPropertyId;
+			this._lastCardColorPropertyId = currentCardColorPropertyId;
+
+			const currentCardColorOrderKey = JSON.stringify(this.config?.get('cardColorOrder') ?? []);
+			const cardColorOrderChanged = currentCardColorOrderKey !== this._lastCardColorOrderKey;
+			this._lastCardColorOrderKey = currentCardColorOrderKey;
+			const cardColorChanged = cardColorPropertyChanged || cardColorOrderChanged;
+
 			const currentImageFit = this.config?.get('imageFit') === 'contain' ? 'contain' : 'cover';
 			const imageFitChanged = currentImageFit !== this._lastImageFit;
 			this._lastImageFit = currentImageFit;
@@ -488,6 +549,7 @@ export class KanbanView extends BasesView {
 				imageFitChanged ||
 				imageAspectRatioChanged ||
 				swimlanePropertyChanged ||
+				cardColorChanged ||
 				quickAddFolderChanged;
 
 			const lanes = new Map<string | null, Map<string, BasesEntry[]>>();
@@ -1024,6 +1086,9 @@ export class KanbanView extends BasesView {
 			wrapValues: this._lastWrapValue ?? false,
 			order: this.config?.getOrder() ?? [],
 			getDisplayName: (id) => this.config?.getDisplayName(id) ?? id,
+			cardColorPropertyId: this.cardColorPropertyId,
+			cardColorValues: this._cardColorValues,
+			resolveColor: (value) => this._cardColorMap.get(value) ?? null,
 		};
 	}
 
@@ -1032,7 +1097,37 @@ export class KanbanView extends BasesView {
 			onHoverPreview: (lt, sp, e, el) => this.triggerHoverPreview(lt, sp, e, el),
 			onSetActiveCard: (path) => this.setActiveCard(path),
 			onOpenInBackgroundTab: (file) => this.openInBackgroundTab(file),
+			onSetCardProperty: (entry, propId, value) => void this.setCardProperty(entry, propId, value),
 		};
+	}
+
+	/**
+	 * Write a single frontmatter property (the inline status switcher). The
+	 * resulting file change fires onDataUpdated → render, which repaints the
+	 * card with its new accent color and select value.
+	 */
+	private async setCardProperty(entry: BasesEntry, propertyId: BasesPropertyId, value: string): Promise<void> {
+		if (!this.app?.fileManager) {
+			console.warn('File manager not available');
+			return;
+		}
+		const parsed = parsePropertyId(propertyId);
+		if (parsed.type !== 'note' || !parsed.name) {
+			console.warn('Card-color property is not a writable note property:', propertyId);
+			return;
+		}
+		const propertyName = parsed.name;
+		try {
+			await this.app.fileManager.processFrontMatter(entry.file, (frontmatter: Record<string, unknown>) => {
+				if (value === '') {
+					delete frontmatter[propertyName];
+				} else {
+					frontmatter[propertyName] = value;
+				}
+			});
+		} catch (error) {
+			console.error('Error updating card property:', error);
+		}
 	}
 
 	private createCard(entry: BasesEntry): HTMLElement {
@@ -1468,6 +1563,19 @@ export class KanbanView extends BasesView {
 				type: 'property',
 				key: 'cardTitleProperty',
 				placeholder: t('option.cardTitle.placeholder'),
+			},
+			{
+				displayName: t('option.cardColor'),
+				type: 'property',
+				key: 'cardColorProperty',
+				filter: (prop: string) => !prop.startsWith('file.'),
+				placeholder: t('option.cardColor.placeholder'),
+			},
+			{
+				displayName: t('option.cardColorOrder'),
+				type: 'multitext',
+				key: 'cardColorOrder',
+				shouldHide: (config: BasesViewConfig) => !config.getAsPropertyId('cardColorProperty'),
 			},
 			{
 				displayName: t('option.imageProperty'),

@@ -564,6 +564,41 @@
 	margin: 0;
 }
 
+/* Card accent driven by the card-color / status property (--obk-card-accent).
+   Full-border tint + a soft background wash, intentionally NOT a left color bar. */
+.obk-card--colored {
+	border-color: color-mix(in srgb, var(--obk-card-accent, transparent) 55%, var(--background-modifier-border));
+	background: color-mix(in srgb, var(--obk-card-accent, transparent) 7%, var(--background-primary));
+}
+
+.obk-card--colored.obk-card--hover {
+	border-color: color-mix(in srgb, var(--obk-card-accent, transparent) 75%, var(--interactive-accent));
+}
+
+/* Inline status switcher on the card */
+.obk-card-status {
+	align-items: center;
+	white-space: normal;
+	overflow: visible;
+}
+
+.obk-card-status-select {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: var(--font-ui-smaller);
+	padding: 2px 6px;
+	border-radius: 4px;
+	border: 1px solid
+		color-mix(in srgb, var(--obk-card-accent, var(--background-modifier-border)) 60%, var(--background-modifier-border));
+	background: color-mix(in srgb, var(--obk-card-accent, transparent) 12%, var(--background-primary));
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.obk-card-status-select:hover {
+	border-color: color-mix(in srgb, var(--obk-card-accent, var(--interactive-accent)) 80%, var(--interactive-accent));
+}
+
 .obk-quick-add-form {
 	display: flex;
 	flex-direction: column;

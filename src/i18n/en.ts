@@ -8,6 +8,9 @@ export const en = {
 	'option.quickAddFolder.placeholder': 'Required for + button',
 	'option.cardTitle': 'Card title property',
 	'option.cardTitle.placeholder': 'Default: file name',
+	'option.cardColor': 'Card color / status property',
+	'option.cardColor.placeholder': 'Optional: color cards + inline switcher',
+	'option.cardColorOrder': 'Status options (ordered)',
 	'option.imageProperty': 'Image property',
 	'option.imageProperty.placeholder': 'Optional: image link property',
 	'option.imageFit': 'Image fit',
@@ -18,8 +21,7 @@ export const en = {
 
 	'label.uncategorized': 'Uncategorized',
 	'label.noColor': 'No color',
-	'notice.sortedCardOrder':
-		'⚠️ Sort is active. Clear it to manually reorder cards within a column.',
+	'notice.sortedCardOrder': '⚠️ Sort is active. Clear it to manually reorder cards within a column.',
 	'empty.noEntries': 'No entries found. Add some notes to your base.',
 	'empty.noProperties': 'No properties found in entries.',
 

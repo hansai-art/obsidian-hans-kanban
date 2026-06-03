@@ -1,17 +1,17 @@
+import { getLanguage } from 'obsidian';
 import { en, type StringKey } from './en.ts';
 import { zhTW } from './zh-TW.ts';
 
 /**
- * Detects the active locale from Obsidian's stored UI language.
- * Obsidian persists the chosen language in localStorage under "language".
+ * Detects the active locale from Obsidian's UI language.
  * Any zh* variant maps to Traditional Chinese; everything else falls back to English.
  */
 function detectLocale(): 'zh-TW' | 'en' {
 	try {
-		const lang = window.localStorage.getItem('language');
+		const lang = getLanguage();
 		if (lang && lang.toLowerCase().startsWith('zh')) return 'zh-TW';
 	} catch {
-		// localStorage may be unavailable in some contexts (tests); fall through.
+		// getLanguage may be unavailable in some contexts (tests); fall through.
 	}
 	return 'en';
 }
