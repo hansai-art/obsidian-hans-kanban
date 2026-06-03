@@ -169,6 +169,7 @@ export class KanbanView extends BasesView {
 	private _activeCardPath: string | null = null;
 	private _minimalMode = false;
 	private _minimalToggleEl: HTMLElement | null = null;
+	private _minimalRetryScheduled = false;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, legacyData: LegacyData | null = null) {
 		super(controller);
@@ -1117,41 +1118,97 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * Ensure the top-right minimal-mode toggle button exists and reflects state.
-	 * The container is emptied on full rebuilds, so re-create the button when it
-	 * is no longer attached. Clicking flips minimal mode and persists it.
+	 * Ensure the minimal-mode toggle exists and reflects state. Preferred home is
+	 * Obsidian's native Bases toolbar (the sort/filter/properties row) so the
+	 * board canvas stays clean — true to "minimal". If that toolbar can't be
+	 * found (API/DOM change), fall back to a small floating button in the board
+	 * corner. Re-injected whenever it goes missing (Obsidian may rebuild its
+	 * toolbar independently of our renders).
 	 */
-	private _ensureMinimalToggle(): void {
-		if (!this._minimalToggleEl || !this.containerEl.contains(this._minimalToggleEl)) {
-			// In-flow toolbar pinned to the top of the board (no overlay positioning).
-			const toolbar = this.containerEl.createDiv({ cls: CSS_CLASSES.BOARD_TOOLBAR });
-			this.containerEl.prepend(toolbar);
+	private _findBasesToolbar(): HTMLElement | null {
+		// The native Bases toolbar container. Items (views/sort/filter/properties/
+		// search/new) are direct .bases-toolbar-item children; there is no
+		// ".bases-toolbar-items" wrapper. Scoped to this view's leaf.
+		const scope = this.containerEl.closest('.workspace-leaf') ?? this.containerEl.closest('.workspace-leaf-content');
+		return scope?.querySelector<HTMLElement>('.bases-toolbar') ?? null;
+	}
 
-			const btn = toolbar.createDiv({ cls: CSS_CLASSES.MINIMAL_TOGGLE });
-			btn.setAttribute('role', 'button');
-			btn.setAttribute('tabindex', '0');
-			btn.setAttribute('aria-label', t('label.minimalMode'));
-			const iconEl = btn.createSpan({ cls: CSS_CLASSES.MINIMAL_TOGGLE_ICON });
-			setIcon(iconEl, 'eye-off');
-			btn.createSpan({ text: t('label.minimalShort') });
-			const toggle = () => {
-				this._minimalMode = !this._minimalMode;
-				this.config?.set('minimalMode', this._minimalMode);
-				this._applyMinimalMode();
-				this._updateMinimalToggleState();
-			};
-			btn.addEventListener('click', (e) => {
-				e.stopPropagation();
-				toggle();
-			});
-			btn.addEventListener('keydown', (e) => {
-				if (e.key !== 'Enter' && e.key !== ' ') return;
-				e.preventDefault();
-				toggle();
-			});
-			this._minimalToggleEl = btn;
+	private _ensureMinimalToggle(): void {
+		const toolbarItems = this._findBasesToolbar();
+
+		// The native toolbar lives outside our container (in .bases-header), so it
+		// survives view rebuilds. A fresh view instance starts with a null toggle
+		// ref and would append a new button while the previous instances' buttons
+		// linger, producing duplicates. Purge any toggle in this leaf that isn't
+		// the one we currently own (both in the toolbar and any floating fallback).
+		const home = toolbarItems ?? this.containerEl;
+		const scope =
+			this.containerEl.closest('.workspace-leaf') ?? this.containerEl.closest('.workspace-leaf-content') ?? home;
+		scope.querySelectorAll(`.${CSS_CLASSES.MINIMAL_TOGGLE}`).forEach((el) => {
+			if (el !== this._minimalToggleEl) el.remove();
+		});
+
+		const placed = this._minimalToggleEl?.isConnected ?? false;
+		const inToolbar = !!(toolbarItems && this._minimalToggleEl && toolbarItems.contains(this._minimalToggleEl));
+
+		// (Re)create when missing, or migrate the floating fallback into the
+		// native toolbar once it becomes available.
+		if (!placed || (toolbarItems && !inToolbar)) {
+			this._minimalToggleEl?.remove();
+			this._minimalToggleEl = this._createMinimalToggle(toolbarItems);
 		}
 		this._updateMinimalToggleState();
+
+		// Obsidian may build its toolbar after our first render. Poll briefly so
+		// the button hops from the floating fallback into the toolbar when ready.
+		if (!toolbarItems && !this._minimalRetryScheduled) {
+			this._minimalRetryScheduled = true;
+			let tries = 0;
+			const retry = () => {
+				if (this._findBasesToolbar()) {
+					this._minimalRetryScheduled = false;
+					this._ensureMinimalToggle();
+				} else if (++tries < 12) {
+					window.setTimeout(retry, 150);
+				} else {
+					this._minimalRetryScheduled = false;
+				}
+			};
+			window.setTimeout(retry, 150);
+		}
+	}
+
+	private _createMinimalToggle(toolbarItems: HTMLElement | null): HTMLElement {
+		const inToolbar = toolbarItems !== null;
+		const parent = toolbarItems ?? this.containerEl;
+		const cls = inToolbar
+			? `bases-toolbar-item ${CSS_CLASSES.MINIMAL_TOGGLE}`
+			: `${CSS_CLASSES.MINIMAL_TOGGLE} ${CSS_CLASSES.MINIMAL_TOGGLE_FLOATING}`;
+		const btn = parent.createDiv({ cls });
+		btn.setAttribute('role', 'button');
+		btn.setAttribute('tabindex', '0');
+		btn.setAttribute('aria-label', t('label.minimalMode'));
+
+		const iconEl = btn.createSpan({ cls: CSS_CLASSES.MINIMAL_TOGGLE_ICON });
+		setIcon(iconEl, 'eye-off');
+		btn.createSpan({ text: t('label.minimalShort') });
+
+		const toggle = () => {
+			this._minimalMode = !this._minimalMode;
+			this.config?.set('minimalMode', this._minimalMode);
+			this._applyMinimalMode();
+			this._updateMinimalToggleState();
+		};
+		btn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			toggle();
+		});
+		btn.addEventListener('keydown', (e) => {
+			if (e.key !== 'Enter' && e.key !== ' ') return;
+			e.preventDefault();
+			toggle();
+		});
+		return btn;
 	}
 
 	private _updateMinimalToggleState(): void {
@@ -1609,6 +1666,10 @@ export class KanbanView extends BasesView {
 		this.destroySortables();
 		this.activeColorPicker?.remove();
 		this.activeColorPicker = null;
+		// The toggle may live in the native toolbar (outside our container), so it
+		// won't be torn down with the view. Remove it explicitly to avoid orphans.
+		this._minimalToggleEl?.remove();
+		this._minimalToggleEl = null;
 	}
 
 	/**

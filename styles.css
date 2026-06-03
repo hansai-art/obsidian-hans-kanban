@@ -1,3 +1,17 @@
+/* Custom Bases views don't inherit the full-height fill that native table/card
+   views get, so the Bases wrapper collapses to content height and leaves an
+   empty band (background-primary) below the board. Make the wrapper hosting our
+   view fill its leaf so the board reaches the bottom. */
+.bases-view:has(> .obk-view-container) {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: 100%;
+	/* Bases adds a ~60px bottom padding to its view wrapper; since our container
+	   is height:100% it only spans the content box, so that padding shows up as
+	   an empty band below the board. Drop it so the board reaches the leaf edge. */
+	padding-bottom: 0;
+}
+
 /* Kanban View Container */
 .obk-view-container {
 	container-type: inline-size;
@@ -9,32 +23,14 @@
 	overflow: hidden;
 }
 
-/* Compact toolbar above the board (in normal flow — no overlay positioning). */
-.obk-board-toolbar {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	flex-shrink: 0;
-	margin-bottom: 8px;
-}
-
-/* Minimal-mode toggle button (lives in the board toolbar). */
+/* Minimal-mode toggle. Default home is Obsidian's native Bases toolbar, where
+   it carries the .bases-toolbar-item class and inherits that row's styling —
+   we only add the icon layout and an active highlight. */
 .obk-minimal-toggle {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	height: 26px;
-	padding: 0 9px;
-	border-radius: 6px;
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
-	background: var(--background-secondary);
-	border: 1px solid var(--background-modifier-border);
 	cursor: pointer;
-	--icon-size: var(--icon-xs);
-	transition:
-		color 0.1s ease,
-		background 0.1s ease;
 }
 
 .obk-minimal-toggle-icon {
@@ -42,12 +38,33 @@
 	align-items: center;
 }
 
-.obk-minimal-toggle:hover {
+.obk-minimal-toggle--active {
+	color: var(--text-accent);
+}
+
+/* Fallback only: a self-contained floating button in the board's top-right,
+   used if the native toolbar can't be located. */
+.obk-minimal-toggle--floating {
+	position: absolute;
+	top: 6px;
+	right: 8px;
+	z-index: 20;
+	height: 26px;
+	padding: 0 9px;
+	border-radius: 6px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	--icon-size: var(--icon-xs);
+}
+
+.obk-minimal-toggle--floating:hover {
 	color: var(--text-normal);
 	background: var(--background-modifier-hover);
 }
 
-.obk-minimal-toggle--active {
+.obk-minimal-toggle--floating.obk-minimal-toggle--active {
 	color: var(--text-on-accent);
 	background: var(--interactive-accent);
 	border-color: var(--interactive-accent);
