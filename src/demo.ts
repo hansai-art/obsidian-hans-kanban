@@ -131,9 +131,9 @@ views:
         - ${LAUNCH}
     columnColors:
       note.area:
-        ${PLAN}: blue
-        ${BUILD}: yellow
-        ${LAUNCH}: green
+        ${PLAN}: red
+        ${BUILD}: orange
+        ${LAUNCH}: blue
 `;
 
 /**
