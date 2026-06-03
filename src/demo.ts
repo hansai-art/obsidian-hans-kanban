@@ -39,7 +39,7 @@ const DEMO_NOTES: DemoNote[] = [
 	{
 		file: '01 歡迎 Welcome.md',
 		area: PLAN,
-		status: DONE,
+		status: TODO,
 		outline: ['Columns are colored by category', 'Drag a card between columns'],
 		body: '這是一塊範例看板。This is a sample board: drag the cards around and watch what happens.',
 	},
@@ -60,21 +60,21 @@ const DEMO_NOTES: DemoNote[] = [
 	{
 		file: '04 依狀態上色 Color by status.md',
 		area: BUILD,
-		status: TODO,
+		status: DOING,
 		outline: ['Card color follows the status value', '🔴 To Do, 🟡 In Progress, 🟢 Done'],
 		body: '卡片顏色跟著「狀態」走。A card is colored by its status value.',
 	},
 	{
 		file: '05 欄寬與極簡 Width & minimal.md',
 		area: LAUNCH,
-		status: TODO,
+		status: DONE,
 		outline: ['Drag a column edge to resize it', 'The Minimal toggle hides labels'],
 		body: '試試拖欄位右邊界,或按工具列上的「極簡」。Try resizing a column or the Minimal toggle.',
 	},
 	{
 		file: '06 用自己的筆記 Your own notes.md',
 		area: LAUNCH,
-		status: DOING,
+		status: DONE,
 		outline: ['Add a category and a status to your notes', 'Group by your category, color by status'],
 		body: '準備好了嗎?換成你自己的筆記吧。Ready? Point it at your own notes next.',
 	},
