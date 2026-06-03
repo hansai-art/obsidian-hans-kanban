@@ -77,6 +77,13 @@ export function isColumnColors(value: unknown): value is Record<string, Record<s
 	);
 }
 
+export function isColumnWidths(value: unknown): value is Record<string, Record<string, number>> {
+	return (
+		isRecord(value) &&
+		Object.values(value).every((v) => isRecord(v) && Object.values(v).every((n) => typeof n === 'number'))
+	);
+}
+
 export function isCardOrders(value: unknown): value is Record<string, Record<string, string[]>> {
 	return (
 		isRecord(value) &&
@@ -140,12 +147,14 @@ export class KanbanView extends BasesView {
 		swimlaneOrder: string[];
 		cardOrders: Record<string, string[]>;
 		columnColors: Record<string, string>;
+		columnWidths: Record<string, number>;
 		collapsedLanes: Set<string>;
 	} = {
 		columnOrder: [],
 		swimlaneOrder: [],
 		cardOrders: {},
 		columnColors: {}, // columnValue → colorName
+		columnWidths: {}, // columnValue → px width
 		collapsedLanes: new Set(),
 	};
 	private _prefsPropertyId: BasesPropertyId | null = null;
@@ -330,6 +339,12 @@ export class KanbanView extends BasesView {
 		}
 		this._prefs.columnColors = columnColors ? { ...columnColors } : {};
 
+		// Per-column widths (px), scoped by group property. No legacy migration.
+		const rawWidths = this.config?.get('columnWidths');
+		const allWidths = isColumnWidths(rawWidths) ? rawWidths : {};
+		const columnWidths = allWidths[propertyId] ?? null;
+		this._prefs.columnWidths = columnWidths ? { ...columnWidths } : {};
+
 		// Collapsed swimlanes — scoped by group+swimlane property; default = none
 		// collapsed (lanes start fully expanded so all cards are visible).
 		const rawCollapsed = this.config?.get('collapsedLanes');
@@ -379,6 +394,7 @@ export class KanbanView extends BasesView {
 			swimlaneScopedKey ?? this._prefsPropertyId,
 		);
 		this._persistConfigKey('columnColors', isColumnColors, this._prefs.columnColors, this._prefsPropertyId);
+		this._persistConfigKey('columnWidths', isColumnWidths, this._prefs.columnWidths, this._prefsPropertyId);
 
 		if (swimlaneScopedKey) {
 			this._persistConfigKey('swimlaneOrders', isColumnOrders, this._prefs.swimlaneOrder, swimlaneScopedKey);
@@ -442,6 +458,9 @@ export class KanbanView extends BasesView {
 
 			// Distinct values + color map for the card-color / status property.
 			this._computeCardColors(entries);
+
+			// Global column width slider → CSS variable on the container.
+			this._applyGlobalColumnWidth();
 
 			// Group entries — 2D when swimlanes are active, 1D otherwise. The
 			// column-axis preference logic (order, colors, new-value detection)
@@ -1050,7 +1069,7 @@ export class KanbanView extends BasesView {
 			doc: this.containerEl.doc,
 			card: this._buildCardCtx(),
 			cardCb: this._buildCardCallbacks(),
-			prefs: { columnColors: this._prefs.columnColors },
+			prefs: { columnColors: this._prefs.columnColors, columnWidths: this._prefs.columnWidths },
 			dragging: this._dragging,
 			cardFingerprints: this._cardFingerprints,
 		};
@@ -1063,7 +1082,28 @@ export class KanbanView extends BasesView {
 			onRemoveColumn: (val, el) => this.removeColumn(val, el),
 			createAddButton: (colVal, laneVal) => this.createAddButton(colVal, laneVal),
 			getQuickAddFolder: () => this.getQuickAddFolder(),
+			onColumnResize: (val, width) => this.setColumnWidth(val, width),
 		};
+	}
+
+	/** Persist a per-column width override (px). Called on resize-handle release. */
+	private setColumnWidth(columnValue: string, width: number | null): void {
+		if (width === null) {
+			delete this._prefs.columnWidths[columnValue];
+		} else {
+			this._prefs.columnWidths[columnValue] = Math.round(width);
+		}
+		this._persistPrefs();
+	}
+
+	/** Apply the global column-width slider as a CSS variable on the container. */
+	private _applyGlobalColumnWidth(): void {
+		const raw = Number(this.config?.get('columnWidth'));
+		if (Number.isFinite(raw) && raw > 0) {
+			this.containerEl.style.setProperty('--obk-column-width', `${raw}px`);
+		} else {
+			this.containerEl.style.removeProperty('--obk-column-width');
+		}
 	}
 
 	private createColumn(
@@ -1603,6 +1643,15 @@ export class KanbanView extends BasesView {
 				displayName: t('option.wrapPropertyValues'),
 				type: 'toggle',
 				key: 'wrapPropertyValues',
+			},
+			{
+				displayName: t('option.columnWidth'),
+				type: 'slider',
+				key: 'columnWidth',
+				default: 280,
+				min: 200,
+				max: 520,
+				step: 10,
 			},
 		];
 	}

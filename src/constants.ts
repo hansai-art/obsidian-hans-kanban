@@ -127,6 +127,10 @@ export const CSS_CLASSES = {
 	// Column remove button (shown only when column is empty)
 	COLUMN_REMOVE_BTN: 'obk-column-remove-btn',
 
+	// Per-column width resize handle
+	COLUMN_RESIZE_HANDLE: 'obk-column-resize-handle',
+	COLUMN_RESIZING: 'obk-column--resizing',
+
 	// Quick add modal
 	QUICK_ADD_FORM: 'obk-quick-add-form',
 	QUICK_ADD_INPUT: 'obk-quick-add-input',

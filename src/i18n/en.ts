@@ -11,6 +11,7 @@ export const en = {
 	'option.cardColor': 'Card color / status property',
 	'option.cardColor.placeholder': 'Optional: color cards + inline switcher',
 	'option.cardColorOrder': 'Status options (ordered)',
+	'option.columnWidth': 'Column width',
 	'option.imageProperty': 'Image property',
 	'option.imageProperty.placeholder': 'Optional: image link property',
 	'option.imageFit': 'Image fit',

@@ -13,6 +13,7 @@ export const zhTW: Record<StringKey, string> = {
 	'option.cardColor': '卡片顏色 / 狀態欄位',
 	'option.cardColor.placeholder': '選填：卡片變色 + 卡上切換',
 	'option.cardColorOrder': '狀態選項（依序）',
+	'option.columnWidth': '欄位寬度',
 	'option.imageProperty': '圖片欄位',
 	'option.imageProperty.placeholder': '選填：圖片連結欄位',
 	'option.imageFit': '圖片填充方式',

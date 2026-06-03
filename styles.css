@@ -241,7 +241,8 @@
 /* Kanban Column */
 .obk-column {
 	--obk-column-accent-color: transparent;
-	flex: 0 0 clamp(200px, 60cqw, 280px);
+	position: relative;
+	flex: 0 0 var(--obk-column-width, clamp(200px, 60cqw, 280px));
 	display: flex;
 	flex-direction: column;
 	background: var(--background-secondary);
@@ -250,6 +251,30 @@
 	min-height: 200px;
 	max-height: 100%;
 	overflow: hidden;
+}
+
+/* Right-edge drag handle for per-column width. Sits inside the column's
+   rounded border (overflow: hidden clips anything outside). Drag to resize,
+   double-click to clear back to the global width. */
+.obk-column-resize-handle {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 8px;
+	height: 100%;
+	cursor: col-resize;
+	z-index: 5;
+	background: transparent;
+	transition: background 0.1s ease;
+}
+
+.obk-column-resize-handle:hover,
+.obk-column--resizing .obk-column-resize-handle {
+	background: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+}
+
+.obk-column--resizing {
+	user-select: none;
 }
 
 .obk-column-header {
@@ -545,8 +570,16 @@
 }
 
 .obk-card-property-wrap .obk-card-property-value {
-	white-space: normal;
 	text-overflow: initial;
+}
+
+/* pre-wrap so newline-joined bullet strings (•\n•\n•) render as a real
+   multi-line list natively — no user CSS snippet required. The rendered
+   markdown child can set its own white-space, so target it too and use
+   !important to win against Obsidian's markdown-rendered defaults. */
+.obk-card-property-wrap .obk-card-property-value,
+.obk-card-property-wrap .obk-card-property-value > * {
+	white-space: pre-wrap !important;
 }
 
 .obk-card-property-label {
