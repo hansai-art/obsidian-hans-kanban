@@ -355,6 +355,18 @@
 	gap: 8px;
 }
 
+/* When a column has an assigned color, carry the accent past the header: tint
+   the column outline and wash the body so the whole column reads as that color,
+   not just the header strip. Scoped to [data-column-color] so plain columns are
+   untouched. */
+.obk-column[data-column-color] {
+	border-color: color-mix(in srgb, var(--obk-column-accent-color) 45%, var(--background-modifier-border));
+}
+
+.obk-column[data-column-color] .obk-column-body {
+	background: color-mix(in srgb, var(--obk-column-accent-color) 7%, transparent);
+}
+
 /* Column color picker button */
 .obk-column-color-btn {
 	width: 16px;
