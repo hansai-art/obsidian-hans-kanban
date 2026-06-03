@@ -1,12 +1,25 @@
-# Kanban Bases View Plugin for Obsidian
+# Hans Kanban
 
-A kanban-style drag-and-drop custom view for Obsidian Bases that allows you to organize your notes into columns based on any property.
+A kanban-style drag-and-drop custom view for Obsidian Bases that organizes your notes into columns based on any property.
+
+> **Fork notice.** Hans Kanban is a fork of [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License. It adds a Traditional Chinese UI, status-driven card colors with an on-card switcher, adjustable column widths, a minimal (zen) mode, and native bullet wrapping on top of the original. See [Acknowledgments](#acknowledgments).
 
 ## Demo
 
 <video src="https://github.com/user-attachments/assets/fa75825a-3e8e-4b92-97b9-0216cabde08d" controls width="100%" title="Kanban Bases View Demo - Drag and drop with color themes"></video>
 
 ## Features
+
+### Added in this fork
+
+- **Traditional Chinese UI**: All view strings are localized (zh-TW) with English fallback, detected from Obsidian's language setting
+- **Card Color by Status**: Tint cards by any property's value (leading color emoji like 🔴/🟢 maps automatically, otherwise a stable palette), with an on-card dropdown to switch the value and recolor instantly
+- **Column Color Throughout**: A column's assigned color carries past the header to its outline and a soft body wash, so the whole column reads as that color
+- **Adjustable Column Width**: A global width slider plus a per-column drag handle (double-click to reset), persisted per base
+- **Minimal (Zen) Mode**: A toggle docked in the native Bases toolbar that hides per-card property labels for a cleaner board
+- **Native Bullet Wrapping**: Long bulleted property values wrap cleanly without a custom CSS snippet
+
+### From the original plugin
 
 - **Dynamic Column Generation**: Select any property from your base to generate kanban columns automatically
 - **Drag and Drop**: Move cards between columns with smooth animations
@@ -38,8 +51,8 @@ A kanban-style drag-and-drop custom view for Obsidian Bases that allows you to o
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/xiwcx/obsidian-bases-kanban-custom-view.git
-   cd obsidian-bases-kanban-custom-view
+   git clone https://github.com/hansai-art/obsidian-hans-kanban.git
+   cd obsidian-hans-kanban
    ```
 
 2. Install dependencies:
@@ -194,5 +207,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
+- Forked from [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan, used under the MIT License. The original copyright is retained in [LICENSE](LICENSE).
 - Built with [SortableJS](https://sortablejs.github.io/Sortable/) for drag-and-drop functionality
 - Inspired by the need for better task management in Obsidian Bases
