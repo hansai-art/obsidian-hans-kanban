@@ -1,4 +1,13 @@
-import type { BasesEntry, BasesPropertyId, BasesViewConfig, HoverPopover, QueryController, ViewOption } from 'obsidian';
+import type {
+	BasesEntry,
+	BasesPropertyId,
+	BasesViewConfig,
+	CachedMetadata,
+	EventRef,
+	HoverPopover,
+	QueryController,
+	ViewOption,
+} from 'obsidian';
 import { BasesView, Keymap, Notice, normalizePath, parsePropertyId, setIcon } from 'obsidian';
 import {
 	createCard as createCardEl,
@@ -122,6 +131,14 @@ export class KanbanView extends BasesView {
 	 */
 	private _cardColorPrefs: Record<string, string> = {};
 	private _cardColorPrefsKey: BasesPropertyId | null = null;
+	/**
+	 * metadataCache "changed" subscription that auto-prepends a color emoji to
+	 * any card-color value typed without one (the native property editor, manual
+	 * frontmatter edits, anywhere). Re-entrancy guard prevents the listener from
+	 * reacting to its own writes. Both cleaned up in onClose.
+	 */
+	private _metadataChangeRef: EventRef | null = null;
+	private _normalizingColorPaths: Set<string> = new Set();
 	private _columnSortables: Map<string, Sortable> = new Map();
 	private _entryMap: Map<string, BasesEntry> = new Map();
 	private swimlaneSortable: Sortable | null = null;
@@ -232,6 +249,15 @@ export class KanbanView extends BasesView {
 			const sourcePath = cardEl.instanceOf(HTMLElement) ? (cardEl.getAttribute(DATA_ATTRIBUTES.ENTRY_PATH) ?? '') : '';
 			this.triggerHoverPreview(href, sourcePath, evt, linkEl);
 		});
+
+		// Auto-color: whenever a note's card-color value is edited (native property
+		// editor, manual frontmatter edit, sync) and lacks a leading color emoji,
+		// prepend the resolved palette emoji so every value always carries a color.
+		if (this.app?.metadataCache && typeof this.app.metadataCache.on === 'function') {
+			this._metadataChangeRef = this.app.metadataCache.on('changed', (file, _data, cache) => {
+				void this._autoColorEmoji(file, cache);
+			});
+		}
 
 		this._debouncedRender = debounce(() => {
 			try {
@@ -1403,6 +1429,50 @@ export class KanbanView extends BasesView {
 		return emoji ? `${emoji} ${value}` : value;
 	}
 
+	/** Strip a single leading color emoji (and its trailing space) from a value. */
+	private _stripLeadingColorEmoji(value: string): string {
+		const leadEmoji = [...value][0] ?? '';
+		if (!EMOJI_COLOR_MAP[leadEmoji]) return value;
+		return value.slice(leadEmoji.length).replace(/^\s+/, '');
+	}
+
+	/**
+	 * metadataCache "changed" handler. When a note that belongs to this board has
+	 * a card-color value lacking a leading color emoji, rewrite its frontmatter to
+	 * prepend the resolved palette emoji. Scoped to the current entries and guarded
+	 * against reacting to its own write (the rewritten value carries an emoji, so a
+	 * second pass returns early anyway, but the guard avoids a redundant write).
+	 */
+	private async _autoColorEmoji(file: TFile, cache: CachedMetadata | null): Promise<void> {
+		if (!this.cardColorPropertyId || !this.app?.fileManager) return;
+		if (!this._entryMap.has(file.path)) return;
+		if (this._normalizingColorPaths.has(file.path)) return;
+		const parsed = parsePropertyId(this.cardColorPropertyId);
+		if (parsed.type !== 'note' || !parsed.name) return;
+		const propertyName = parsed.name;
+		const raw: unknown = cache?.frontmatter?.[propertyName];
+		if (typeof raw !== 'string') return;
+		const value = raw.trim();
+		if (!value) return;
+		const leadEmoji = [...value][0] ?? '';
+		if (EMOJI_COLOR_MAP[leadEmoji]) return; // already colored
+		const colored = this._withColorEmoji(value);
+		if (colored === value) return;
+		this._normalizingColorPaths.add(file.path);
+		try {
+			await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
+				const current = frontmatter[propertyName];
+				if (typeof current === 'string' && current.trim() === value) {
+					frontmatter[propertyName] = colored;
+				}
+			});
+		} catch (error) {
+			console.error('KanbanView: auto color-emoji failed', error);
+		} finally {
+			this._normalizingColorPaths.delete(file.path);
+		}
+	}
+
 	private createCard(entry: BasesEntry): HTMLElement {
 		return createCardEl(entry, this._buildCardCtx(), this._buildCardCallbacks());
 	}
@@ -1467,11 +1537,11 @@ export class KanbanView extends BasesView {
 
 	/**
 	 * Color picker for a card-color value (the inline status switcher's dot).
-	 * Choosing a swatch stores an override in _cardColorPrefs; "none" clears it
-	 * and falls back to the emoji/auto-palette color. The board is re-rendered so
-	 * every card holding that value repaints (patch path: the resolved color is
-	 * part of the card fingerprint). Persistence is deferred to close like all
-	 * prefs, so this never triggers the .base-write rebuild flash.
+	 * Choosing a swatch rewrites the leading color emoji of the frontmatter value
+	 * (e.g. "🟣 測試" → "🟢 測試") across every card that currently holds that
+	 * value, so the chosen color shows everywhere: the card, the Bases table, and
+	 * Obsidian's native property editor. "none" resets to the auto palette color.
+	 * The repaint happens via onDataUpdated after the frontmatter writes settle.
 	 */
 	private openCardColorPicker(anchorEl: HTMLElement, value: string): void {
 		this.activeColorPicker?.remove();
@@ -1480,20 +1550,26 @@ export class KanbanView extends BasesView {
 
 		const popover = anchorEl.doc.createElement('div');
 		popover.className = CSS_CLASSES.COLUMN_COLOR_POPOVER;
-		const currentOverride = this._cardColorPrefs[value] ?? null;
+		const leadEmoji = [...value][0] ?? '';
+		const currentColor = EMOJI_COLOR_MAP[leadEmoji] ?? this._cardColorPrefs[value] ?? null;
 
 		const choose = (colorName: string | null): void => {
-			if (colorName) this._cardColorPrefs[value] = colorName;
-			else delete this._cardColorPrefs[value];
-			this._persistPrefs();
 			popover.remove();
 			this.activeColorPicker = null;
-			this.render();
+			const propertyId = this.cardColorPropertyId;
+			if (!propertyId) return;
+			const bare = this._stripLeadingColorEmoji(value);
+			const emoji = colorName ? COLOR_NAME_TO_EMOJI[colorName] : '';
+			// colorName set → that color's emoji; "none" → let the auto palette pick.
+			const newValue = colorName && emoji ? `${emoji} ${bare}` : this._withColorEmoji(bare);
+			if (newValue === value) return;
+			const targets = (this.data?.data ?? []).filter((e) => (e.getValue(propertyId)?.toString().trim() ?? '') === value);
+			void Promise.all(targets.map((e) => this.setCardProperty(e, propertyId, newValue)));
 		};
 
 		const noneSwatch = anchorEl.doc.createElement('div');
 		noneSwatch.className = `${CSS_CLASSES.COLUMN_COLOR_SWATCH} ${CSS_CLASSES.COLUMN_COLOR_NONE}`;
-		if (!currentOverride) noneSwatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
+		if (!currentColor) noneSwatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
 		noneSwatch.title = t('label.noColor');
 		noneSwatch.addEventListener('click', () => choose(null));
 		popover.appendChild(noneSwatch);
@@ -1503,7 +1579,7 @@ export class KanbanView extends BasesView {
 			swatch.className = CSS_CLASSES.COLUMN_COLOR_SWATCH;
 			swatch.style.background = color.cssVar;
 			swatch.title = color.name;
-			if (currentOverride === color.name) swatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
+			if (currentColor === color.name) swatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
 			swatch.addEventListener('click', () => choose(color.name));
 			popover.appendChild(swatch);
 		}
@@ -1852,6 +1928,10 @@ export class KanbanView extends BasesView {
 		// flash); on close the view is going away, so the rebuild is invisible.
 		this._flushPrefs();
 		this._debouncedRender.cancel();
+		if (this._metadataChangeRef && this.app?.metadataCache?.offref) {
+			this.app.metadataCache.offref(this._metadataChangeRef);
+			this._metadataChangeRef = null;
+		}
 		this.destroySortables();
 		this.activeColorPicker?.remove();
 		this.activeColorPicker = null;

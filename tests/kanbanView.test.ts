@@ -4025,11 +4025,12 @@ describe('Card Color - auto-color and custom override', () => {
 		}
 	});
 
-	test('a custom override beats the auto palette and persists on close', () => {
+	const KNOWN_EMOJIS = Object.values(COLOR_NAME_TO_EMOJI);
+
+	test('picking a color writes that color emoji into the value across matching cards', async () => {
 		const view = makeColoredView();
 		triggerDataUpdate(view);
 
-		// Simulate picking a custom color for "To Do".
 		(view as any).openCardColorPicker(scrollEl, 'To Do');
 		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
 		assert.ok(popover, 'card-color picker popover should open');
@@ -4039,32 +4040,84 @@ describe('Card Color - auto-color and custom override', () => {
 		assert.ok(greenSwatch, 'green swatch should exist');
 		greenSwatch.click();
 
-		assert.strictEqual(
-			(view as any)._cardColorMap.get('To Do'),
-			'var(--color-green)',
-			'override should win over the auto palette color',
-		);
-
-		// Persistence is deferred to close, scoped by the card-color property.
-		(view as any).onClose();
-		const saved = controller.config.get('cardColors') as Record<string, Record<string, string>> | null;
-		assert.strictEqual(saved?.[PROPERTY_STATUS]?.['To Do'], 'green', 'override should be saved under cardColors');
+		// Two "To Do" cards exist; both get rewritten with the green dot.
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 2, 'both matching cards rewritten');
+		const fm: Record<string, unknown> = { status: 'To Do' };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(fm.status, '🟢 To Do', 'value should carry the chosen green dot');
 	});
 
-	test('choosing "none" clears the override back to auto', () => {
-		const view = makeColoredView();
-		controller.config.set('cardColors', { [PROPERTY_STATUS]: { 'To Do': 'green' } });
+	test('picking a color rewrites the leading emoji of an already-colored value', async () => {
+		const controller2: any = createMockQueryController(
+			[createMockBasesEntry(createMockTFile('A.md'), { [PROPERTY_STATUS]: '🟣 測試' })],
+			TEST_PROPERTIES,
+		);
+		controller2.app = app;
+		controller2.config.getAsPropertyId = (key: string) =>
+			key === 'groupByProperty' || key === 'cardColorProperty' ? PROPERTY_STATUS : null;
+		const view = new KanbanView(controller2, scrollEl);
+		setupKanbanViewWithApp(view, app);
 		triggerDataUpdate(view);
-		assert.strictEqual((view as any)._cardColorMap.get('To Do'), 'var(--color-green)', 'starts from saved override');
+
+		(view as any).openCardColorPicker(scrollEl, '🟣 測試');
+		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
+		const green = Array.from(popover.querySelectorAll('.obk-column-color-swatch')).find(
+			(s) => (s as HTMLElement).title === 'green',
+		) as HTMLElement;
+		green.click();
+
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 1, 'the single matching card is rewritten');
+		const fm: Record<string, unknown> = { status: '🟣 測試' };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(fm.status, '🟢 測試', 'purple dot should be replaced by green, bare text preserved');
+	});
+
+	test('choosing "none" resets the value to the auto palette color', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
 
 		(view as any).openCardColorPicker(scrollEl, 'To Do');
 		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
 		(popover.querySelector('.obk-column-color-none') as HTMLElement).click();
 
-		assert.strictEqual((view as any)._cardColorPrefs['To Do'], undefined, 'override should be cleared');
+		assert.ok(app.fileManager.processFrontMatter.calls.length >= 1, 'matching cards rewritten to auto color');
+		const fm: Record<string, unknown> = { status: 'To Do' };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		const written = fm.status as string;
+		assert.ok(written.endsWith(' To Do'), `expected "... To Do", got "${written}"`);
+		assert.ok(KNOWN_EMOJIS.includes([...written][0]), `none should still leave an auto color, got "${written}"`);
 	});
 
-	const KNOWN_EMOJIS = Object.values(COLOR_NAME_TO_EMOJI);
+	test('_autoColorEmoji rewrites an emoji-less value for a card on this board', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		await (view as any)._autoColorEmoji({ path: 'Task 1.md' } as any, { frontmatter: { status: 'To Do' } });
+
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 1, 'one rewrite for the in-board file');
+		const fm: Record<string, unknown> = { status: 'To Do' };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		const written = fm.status as string;
+		assert.ok(written.endsWith(' To Do') && KNOWN_EMOJIS.includes([...written][0]), `got "${written}"`);
+	});
+
+	test('_autoColorEmoji ignores files that are not part of this board', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		await (view as any)._autoColorEmoji({ path: 'Somewhere Else.md' } as any, { frontmatter: { status: '緊急' } });
+
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'out-of-board files are untouched');
+	});
+
+	test('_autoColorEmoji leaves an already-colored value untouched', async () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		await (view as any)._autoColorEmoji({ path: 'Task 1.md' } as any, { frontmatter: { status: '🔴 To Do' } });
+
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'value with a color emoji is not rewritten');
+	});
 
 	test('setCardProperty auto-prepends a palette emoji for an emoji-less value', async () => {
 		const view = makeColoredView();
