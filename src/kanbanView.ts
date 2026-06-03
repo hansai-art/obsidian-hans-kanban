@@ -170,6 +170,7 @@ export class KanbanView extends BasesView {
 	private _minimalMode = false;
 	private _minimalToggleEl: HTMLElement | null = null;
 	private _minimalRetryScheduled = false;
+	private _toolbarObserver: MutationObserver | null = null;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, legacyData: LegacyData | null = null) {
 		super(controller);
@@ -1158,6 +1159,7 @@ export class KanbanView extends BasesView {
 			this._minimalToggleEl = this._createMinimalToggle(toolbarItems);
 		}
 		this._updateMinimalToggleState();
+		this._watchToolbar();
 
 		// Obsidian may build its toolbar after our first render. Poll briefly so
 		// the button hops from the floating fallback into the toolbar when ready.
@@ -1176,6 +1178,33 @@ export class KanbanView extends BasesView {
 			};
 			window.setTimeout(retry, 150);
 		}
+	}
+
+	/**
+	 * Obsidian owns and periodically rebuilds the native .bases-toolbar (tab
+	 * switch, view reload, config changes). Since our toggle lives inside that
+	 * toolbar (outside our container), a rebuild silently drops it and our view
+	 * may not re-render to put it back. Watch the toolbar's header so we can
+	 * re-inject the button into its correct slot the moment Obsidian recreates
+	 * the toolbar.
+	 */
+	private _watchToolbar(): void {
+		if (this._toolbarObserver) return;
+		const header =
+			this._findBasesToolbar()?.parentElement ??
+			this.containerEl.closest('.workspace-leaf-content')?.querySelector('.bases-header');
+		if (!header) return;
+		const observer = new MutationObserver(() => {
+			const toolbar = this._findBasesToolbar();
+			// Re-inject only when the toolbar exists but no longer holds our
+			// button. The contains() check also stops our own insert (which
+			// mutates the header) from triggering an infinite loop.
+			if (toolbar && (!this._minimalToggleEl || !toolbar.contains(this._minimalToggleEl))) {
+				this._ensureMinimalToggle();
+			}
+		});
+		observer.observe(header, { childList: true, subtree: true });
+		this._toolbarObserver = observer;
 	}
 
 	private _createMinimalToggle(toolbarItems: HTMLElement | null): HTMLElement {
@@ -1668,6 +1697,8 @@ export class KanbanView extends BasesView {
 		this.activeColorPicker = null;
 		// The toggle may live in the native toolbar (outside our container), so it
 		// won't be torn down with the view. Remove it explicitly to avoid orphans.
+		this._toolbarObserver?.disconnect();
+		this._toolbarObserver = null;
 		this._minimalToggleEl?.remove();
 		this._minimalToggleEl = null;
 	}
