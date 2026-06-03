@@ -166,6 +166,17 @@ export class KanbanView extends BasesView {
 	 * re-renders triggered during the drag.
 	 */
 	private _dragging = false;
+	/**
+	 * Set when an interactive action (drag, color, width, reorder) mutates _prefs.
+	 * Writing prefs to the .base config (config.set) makes Obsidian's Bases host
+	 * tear down and rebuild the entire view, which is visible as a flash. So we
+	 * never write config during interaction: _prefs is the in-session source of
+	 * truth, and the dirty prefs are flushed to config once in onClose (where the
+	 * unavoidable rebuild is invisible because the view is going away anyway).
+	 */
+	private _prefsDirty = false;
+	/** Like _prefsDirty, but for the minimalMode view option. Flushed on close. */
+	private _minimalModeDirty = false;
 	private _activeCardPath: string | null = null;
 	private _minimalMode = false;
 	private _minimalToggleEl: HTMLElement | null = null;
@@ -317,10 +328,9 @@ export class KanbanView extends BasesView {
 		const legacyOrder = this.legacyData?.columnOrders[propertyId] ?? null;
 		if (!columnOrder && legacyOrder) {
 			columnOrder = legacyOrder;
-			this.config?.set('columnOrders', {
-				...allOrders,
-				[propertyId]: legacyOrder,
-			});
+			// One-time migration from plugin.data.json: keep the value in _prefs and
+			// let it persist on close (never config.set mid-session — that flashes).
+			this._prefsDirty = true;
 		}
 		this._prefs.columnOrder = columnOrder ? [...columnOrder] : [];
 
@@ -337,10 +347,8 @@ export class KanbanView extends BasesView {
 		const legacyColors = this.legacyData?.columnColors[propertyId];
 		if (!columnColors && legacyColors && Object.keys(legacyColors).length > 0) {
 			columnColors = legacyColors;
-			this.config?.set('columnColors', {
-				...allColors,
-				[propertyId]: legacyColors,
-			});
+			// One-time migration; persist on close rather than config.set (flashes).
+			this._prefsDirty = true;
 		}
 		this._prefs.columnColors = columnColors ? { ...columnColors } : {};
 
@@ -385,30 +393,53 @@ export class KanbanView extends BasesView {
 		}
 	}
 
+	/**
+	 * Mark in-session prefs as needing persistence. Does NOT write config — see
+	 * _prefsDirty. The actual write happens in _flushPrefs() on view close.
+	 */
 	private _persistPrefs(): void {
-		if (!this._prefsPropertyId) return;
-		const swimlaneScopedKey = this._prefsSwimlanePropertyId
-			? this.swimlanePrefsKey(this._prefsPropertyId, this._prefsSwimlanePropertyId)
-			: null;
+		this._prefsDirty = true;
+	}
 
-		this._persistConfigKey('columnOrders', isColumnOrders, this._prefs.columnOrder, this._prefsPropertyId);
-		this._persistConfigKey(
-			'cardOrders',
-			isCardOrders,
-			this._prefs.cardOrders,
-			swimlaneScopedKey ?? this._prefsPropertyId,
-		);
-		this._persistConfigKey('columnColors', isColumnColors, this._prefs.columnColors, this._prefsPropertyId);
-		this._persistConfigKey('columnWidths', isColumnWidths, this._prefs.columnWidths, this._prefsPropertyId);
+	/**
+	 * Write the in-session prefs to the .base config. Called only from onClose,
+	 * never mid-session: each config.set() makes the Bases host rebuild the view
+	 * (a visible flash), which is acceptable only when the view is closing.
+	 */
+	private _flushPrefs(): void {
+		try {
+			if (this._minimalModeDirty) {
+				this._minimalModeDirty = false;
+				this.config?.set('minimalMode', this._minimalMode);
+			}
+			if (this._prefsDirty && this._prefsPropertyId) {
+				this._prefsDirty = false;
+				const swimlaneScopedKey = this._prefsSwimlanePropertyId
+					? this.swimlanePrefsKey(this._prefsPropertyId, this._prefsSwimlanePropertyId)
+					: null;
 
-		if (swimlaneScopedKey) {
-			this._persistConfigKey('swimlaneOrders', isColumnOrders, this._prefs.swimlaneOrder, swimlaneScopedKey);
-			this._persistConfigKey(
-				'collapsedLanes',
-				isCollapsedLanes,
-				Array.from(this._prefs.collapsedLanes),
-				swimlaneScopedKey,
-			);
+				this._persistConfigKey('columnOrders', isColumnOrders, this._prefs.columnOrder, this._prefsPropertyId);
+				this._persistConfigKey(
+					'cardOrders',
+					isCardOrders,
+					this._prefs.cardOrders,
+					swimlaneScopedKey ?? this._prefsPropertyId,
+				);
+				this._persistConfigKey('columnColors', isColumnColors, this._prefs.columnColors, this._prefsPropertyId);
+				this._persistConfigKey('columnWidths', isColumnWidths, this._prefs.columnWidths, this._prefsPropertyId);
+
+				if (swimlaneScopedKey) {
+					this._persistConfigKey('swimlaneOrders', isColumnOrders, this._prefs.swimlaneOrder, swimlaneScopedKey);
+					this._persistConfigKey(
+						'collapsedLanes',
+						isCollapsedLanes,
+						Array.from(this._prefs.collapsedLanes),
+						swimlaneScopedKey,
+					);
+				}
+			}
+		} catch (error) {
+			console.error('KanbanView: failed to flush prefs to config on close', error);
 		}
 	}
 
@@ -443,6 +474,11 @@ export class KanbanView extends BasesView {
 			// Reload prefs when either grouping axis changes.
 			const groupChanged = this.groupByPropertyId !== this._prefsPropertyId;
 			if (groupChanged || swimlanePropertyId !== this._prefsSwimlanePropertyId) {
+				// Persist the outgoing axis's prefs before switching keys, so a
+				// group/swimlane change does not drop unflushed in-session edits.
+				// (Group changes already force a full rebuild, so the config write
+				// here adds no extra flash beyond the rebuild that happens anyway.)
+				this._flushPrefs();
 				this._loadPrefs(this.groupByPropertyId, swimlanePropertyId);
 			}
 
@@ -1224,7 +1260,10 @@ export class KanbanView extends BasesView {
 
 		const toggle = () => {
 			this._minimalMode = !this._minimalMode;
-			this.config?.set('minimalMode', this._minimalMode);
+			// The visual toggle is a CSS class (_applyMinimalMode) and needs no
+			// config write. Defer persisting minimalMode to close — a config.set
+			// here would make the host rebuild the whole view (a flash).
+			this._minimalModeDirty = true;
 			this._applyMinimalMode();
 			this._updateMinimalToggleState();
 		};
@@ -1698,6 +1737,11 @@ export class KanbanView extends BasesView {
 	}
 
 	onClose(): void {
+		// Flush any in-session pref changes (card/column order, colors, widths) to
+		// the .base config now. We deliberately never write config during a session
+		// because each write makes the Bases host rebuild the whole view (a visible
+		// flash); on close the view is going away, so the rebuild is invisible.
+		this._flushPrefs();
 		this._debouncedRender.cancel();
 		this.destroySortables();
 		this.activeColorPicker?.remove();

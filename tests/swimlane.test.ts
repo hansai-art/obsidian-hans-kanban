@@ -224,6 +224,8 @@ describe('Swimlane rendering behavior', () => {
 		highBody.insertBefore(columns[1], columns[0]);
 		(view as any).handleSwimlaneColumnDrop({ to: highBody });
 
+		// Prefs are flushed to config on close (deferred to avoid a rebuild flash).
+		(view as any)._flushPrefs();
 		const savedOrders = controller.config.get('columnOrders') as Record<string, string[]>;
 		assert.deepStrictEqual(savedOrders[PROPERTY_STATUS], ['To Do', 'Done']);
 
@@ -248,6 +250,8 @@ describe('Swimlane rendering behavior', () => {
 		assert.strictEqual(getToggleIcon(toggle), 'chevron-right');
 
 		const priorityScopedKey = `${PROPERTY_STATUS}${SWIMLANE_KEY_SEPARATOR}${PROPERTY_PRIORITY}`;
+		// Prefs are flushed to config on close (deferred to avoid a rebuild flash).
+		(view as any)._flushPrefs();
 		const collapsed = controller.config.get('collapsedLanes') as Record<string, string[]>;
 		assert.deepStrictEqual(collapsed[priorityScopedKey], ['High']);
 
@@ -281,6 +285,8 @@ describe('Swimlane rendering behavior', () => {
 		await (view as any).handleCardDrop({ item: cards[1], from: toDoBody, to: toDoBody, oldIndex: 1, newIndex: 0 });
 
 		const scopedKey = `${PROPERTY_STATUS}${SWIMLANE_KEY_SEPARATOR}${PROPERTY_PRIORITY}`;
+		// Prefs are flushed to config on close (deferred to avoid a rebuild flash).
+		(view as any)._flushPrefs();
 		const savedOrders = controller.config.get('cardOrders') as Record<string, Record<string, string[]>>;
 		assert.ok(savedOrders[scopedKey], 'Swimlane card order should use a group+swimlane storage key');
 		assert.strictEqual(

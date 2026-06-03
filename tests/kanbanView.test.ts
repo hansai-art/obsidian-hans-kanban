@@ -1774,7 +1774,8 @@ describe('Column Reordering - Order Persistence', () => {
 		// handleSwimlaneColumnDrop handles both flat (boardEl) and swimlane (bodyEl) drops
 		(view as any).handleSwimlaneColumnDrop(mockEvent);
 
-		// Verify order was saved in config
+		// Prefs are flushed to config on close (deferred to avoid a rebuild flash).
+		(view as any).onClose();
 		const savedOrders = controller.config.get('columnOrders') as Record<string, string[]> | null;
 		const savedOrder = savedOrders?.[PROPERTY_STATUS];
 		assert.ok(savedOrder, 'Column order should be saved');
@@ -2338,7 +2339,9 @@ describe('Column Colors', () => {
 		);
 		assert.strictEqual(toDoColumn!.getAttribute('data-column-color'), swatchTitle, 'Column data attribute should be set');
 
-		// Config should have been updated to persist the color
+		// Prefs are flushed to config on view close (never mid-session, to avoid a
+		// full view rebuild / flash). Close to flush, then assert persistence.
+		(view as any).onClose();
 		const savedColors = controller.config.get('columnColors') as Record<string, Record<string, string>> | null;
 		assert.strictEqual(savedColors?.[PROPERTY_STATUS]?.['To Do'], swatchTitle, 'saveColumnColor should have been called');
 	});
@@ -2401,7 +2404,8 @@ describe('Legacy Data Migration', () => {
 		const renderedOrder = Array.from(columns).map((col) => col.getAttribute('data-column-value'));
 		assert.strictEqual(renderedOrder[0], 'Done', 'Legacy column order should be applied');
 
-		// And persisted into config
+		// Migration is persisted on close (deferred like all config writes).
+		(view as any).onClose();
 		const saved = controller.config.get('columnOrders') as Record<string, string[]> | null;
 		assert.deepStrictEqual(
 			saved?.[PROPERTY_STATUS],
@@ -2432,7 +2436,8 @@ describe('Legacy Data Migration', () => {
 			'Legacy color should be applied',
 		);
 
-		// And persisted into config
+		// Migration is persisted on close (deferred like all config writes).
+		(view as any).onClose();
 		const saved = controller.config.get('columnColors') as Record<string, Record<string, string>> | null;
 		assert.strictEqual(saved?.[PROPERTY_STATUS]?.['To Do'], 'red', 'Legacy colors should be saved to config');
 	});
@@ -2771,6 +2776,8 @@ describe('Card Order - Persistence', () => {
 		};
 		await (view as any).handleCardDrop(mockEvent);
 
+		// Card order is flushed to config on close (deferred to avoid a rebuild flash).
+		(view as any).onClose();
 		const savedOrders = controller.config.get('cardOrders') as Record<string, Record<string, string[]>>;
 		assert.ok(savedOrders, 'cardOrders should be saved');
 		const columnOrder = savedOrders?.[PROPERTY_STATUS]?.['To Do'];
@@ -2985,6 +2992,8 @@ describe('Card Order - Persistence', () => {
 		};
 		await (view as any).handleCardDrop(mockEvent);
 
+		// Card order is flushed to config on close (deferred to avoid a rebuild flash).
+		(view as any).onClose();
 		const savedOrders = controller.config.get('cardOrders') as Record<string, Record<string, string[]>>;
 		assert.ok(savedOrders?.[PROPERTY_STATUS]?.['To Do'], 'To Do order should be saved');
 		assert.ok(savedOrders?.[PROPERTY_STATUS]?.['Doing'], 'Doing order should be saved');
@@ -3230,6 +3239,8 @@ describe('Empty Column Persistence - Saved columns restored', () => {
 		const columnValues = Array.from(view.containerEl.querySelectorAll('.obk-column')).map((col) =>
 			col.getAttribute('data-column-value'),
 		);
+		// Column-order pruning is flushed to config on close (deferred writes).
+		(view as any).onClose();
 		const savedOrders = controller.config.get('columnOrders') as Record<string, string[]>;
 
 		assert.ok(!columnValues.includes(UNCATEGORIZED_LABEL), 'Empty fallback column should not be rendered');
@@ -3261,6 +3272,8 @@ describe('Empty Column Persistence - Eager order save', () => {
 		setupKanbanViewWithApp(view, app);
 		triggerDataUpdate(view);
 
+		// Eager column-order save is flushed to config on close (deferred writes).
+		(view as any).onClose();
 		const savedOrders = controller.config.get('columnOrders') as Record<string, string[]> | null;
 		const savedOrder = savedOrders?.[PROPERTY_STATUS];
 		assert.ok(savedOrder, 'Column order should be saved after first render');
@@ -3281,6 +3294,8 @@ describe('Empty Column Persistence - Eager order save', () => {
 		controller.data.data = entries.filter((e: any) => e.getValue(PROPERTY_STATUS)?.toString() !== 'Doing');
 		triggerDataUpdate(view);
 
+		// Column order is flushed to config on close (deferred writes).
+		(view as any).onClose();
 		const savedOrders = controller.config.get('columnOrders') as Record<string, string[]>;
 		const savedOrder = savedOrders?.[PROPERTY_STATUS] ?? [];
 		assert.ok(savedOrder.includes('Doing'), 'Emptied column should remain in persisted order');
@@ -3461,6 +3476,8 @@ describe('Empty Column Persistence - Remove column action', () => {
 
 		(view.containerEl.querySelector('[data-column-value="In Progress"] .obk-column-remove-btn') as HTMLElement).click();
 
+		// Removal is flushed to config on close (deferred writes).
+		(view as any).onClose();
 		const savedOrders = controller.config.get('columnOrders') as Record<string, string[]>;
 		const savedOrder = savedOrders?.[PROPERTY_STATUS] ?? [];
 		assert.ok(!savedOrder.includes('In Progress'), 'Removed column should not appear in saved order');
