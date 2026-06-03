@@ -22,6 +22,7 @@ export const en = {
 
 	'label.uncategorized': 'Uncategorized',
 	'label.noColor': 'No color',
+	'label.pickColor': 'Pick color',
 	'label.minimalMode': 'Minimal mode (hide labels)',
 	'label.minimalShort': 'Minimal',
 	'notice.sortedCardOrder': '⚠️ Sort is active. Clear it to manually reorder cards within a column.',

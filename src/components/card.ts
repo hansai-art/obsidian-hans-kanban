@@ -2,6 +2,7 @@ import type { App, BasesEntry, BasesPropertyId } from 'obsidian';
 import { Keymap, NullValue } from 'obsidian';
 import type { TFile } from 'obsidian';
 import { CSS_CLASSES, DATA_ATTRIBUTES } from '../constants.ts';
+import { t } from '../i18n/index.ts';
 
 export interface CardRenderCtx {
 	app: App;
@@ -28,6 +29,8 @@ export interface CardCallbacks {
 	onOpenInBackgroundTab: (file: TFile) => void;
 	/** Write a property value to the entry's frontmatter (inline status switch). */
 	onSetCardProperty: (entry: BasesEntry, propertyId: BasesPropertyId, value: string) => void;
+	/** Open the card-color picker for a card-color value, anchored at the dot. */
+	onPickCardColor: (anchorEl: HTMLElement, value: string) => void;
 }
 
 export function computeCardFingerprint(entry: BasesEntry, ctx: CardRenderCtx): string {
@@ -45,6 +48,10 @@ export function computeCardFingerprint(entry: BasesEntry, ctx: CardRenderCtx): s
 		const val = entry.getValue(ctx.imagePropertyId);
 		parts.push(val === null ? '' : val.toString());
 	}
+	// Include the resolved accent color so a custom-color change repaints the card
+	// on the next render (the value text alone may be unchanged).
+	const colorRaw = cardColorValue(entry, ctx);
+	parts.push(colorRaw ? (ctx.resolveColor(colorRaw) ?? '') : '');
 	return parts.join('\x00');
 }
 
@@ -120,6 +127,25 @@ function renderStatusSelect(
 	cb: CardCallbacks,
 ): void {
 	const current = cardColorValue(entry, ctx) ?? '';
+
+	// Clickable color dot: shows the current value's (auto or custom) color and
+	// opens the card-color picker so any value can be recolored without emoji.
+	if (current) {
+		const dot = propertyEl.createDiv({ cls: CSS_CLASSES.CARD_COLOR_DOT });
+		const cssColor = ctx.resolveColor(current);
+		if (cssColor) dot.style.background = cssColor;
+		else dot.classList.add(CSS_CLASSES.COLUMN_COLOR_NONE);
+		dot.setAttribute('aria-label', t('label.pickColor'));
+		dot.setAttribute('title', t('label.pickColor'));
+		const stop = (e: Event) => e.stopPropagation();
+		dot.addEventListener('mousedown', stop);
+		dot.addEventListener('auxclick', stop);
+		dot.addEventListener('click', (e) => {
+			e.stopPropagation();
+			cb.onPickCardColor(dot, current);
+		});
+	}
+
 	const select = propertyEl.createEl('select', { cls: CSS_CLASSES.CARD_STATUS_SELECT });
 
 	const values = ctx.cardColorValues.slice();

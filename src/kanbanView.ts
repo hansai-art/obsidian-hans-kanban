@@ -113,6 +113,14 @@ export class KanbanView extends BasesView {
 	/** Per-render cache: distinct card-color values + value→css-color map. */
 	private _cardColorValues: string[] = [];
 	private _cardColorMap: Map<string, string> = new Map();
+	/**
+	 * User color overrides for card-color values (value → palette color name),
+	 * scoped to the current cardColorPropertyId. Takes priority over the leading
+	 * emoji and the automatic palette. Persisted under config key 'cardColors'
+	 * (flushed on close like every other pref).
+	 */
+	private _cardColorPrefs: Record<string, string> = {};
+	private _cardColorPrefsKey: BasesPropertyId | null = null;
 	private _columnSortables: Map<string, Sortable> = new Map();
 	private _entryMap: Map<string, BasesEntry> = new Map();
 	private swimlaneSortable: Sortable | null = null;
@@ -249,13 +257,22 @@ export class KanbanView extends BasesView {
 
 	/**
 	 * Build the value→color map and distinct-value list for the card-color
-	 * property. Each distinct value gets a color: a leading color emoji wins
-	 * (🔴 → red), otherwise palette-by-sorted-index so colors stay stable.
+	 * property. Each distinct value gets a color: a user override wins, else a
+	 * leading color emoji (🔴 → red), else palette-by-sorted-index so colors stay
+	 * stable. Every value therefore always resolves to a color (never blank).
 	 */
 	private _computeCardColors(entries: BasesEntry[]): void {
 		this._cardColorValues = [];
 		this._cardColorMap = new Map();
 		if (!this.cardColorPropertyId) return;
+
+		// Load this property's color overrides once when the property changes.
+		if (this.cardColorPropertyId !== this._cardColorPrefsKey) {
+			this._cardColorPrefsKey = this.cardColorPropertyId;
+			const rawCardColors = this.config?.get('cardColors');
+			const all = isColumnColors(rawCardColors) ? rawCardColors : {};
+			this._cardColorPrefs = { ...(all[this.cardColorPropertyId] ?? {}) };
+		}
 
 		// Values actually present in the data.
 		const seen = new Set<string>();
@@ -280,9 +297,10 @@ export class KanbanView extends BasesView {
 		this._cardColorValues = values;
 
 		values.forEach((value, index) => {
+			const override = this._cardColorPrefs[value];
 			const leadEmoji = [...value][0] ?? '';
 			const emojiColor = EMOJI_COLOR_MAP[leadEmoji];
-			const colorName = emojiColor ?? COLOR_PALETTE[index % COLOR_PALETTE.length].name;
+			const colorName = override ?? emojiColor ?? COLOR_PALETTE[index % COLOR_PALETTE.length].name;
 			const paletteEntry = COLOR_PALETTE.find((c) => c.name === colorName);
 			if (paletteEntry) this._cardColorMap.set(value, paletteEntry.cssVar);
 		});
@@ -427,6 +445,11 @@ export class KanbanView extends BasesView {
 				);
 				this._persistConfigKey('columnColors', isColumnColors, this._prefs.columnColors, this._prefsPropertyId);
 				this._persistConfigKey('columnWidths', isColumnWidths, this._prefs.columnWidths, this._prefsPropertyId);
+
+				// Card-color overrides are scoped by the card-color property, not the group.
+				if (this.cardColorPropertyId) {
+					this._persistConfigKey('cardColors', isColumnColors, this._cardColorPrefs, this.cardColorPropertyId);
+				}
 
 				if (swimlaneScopedKey) {
 					this._persistConfigKey('swimlaneOrders', isColumnOrders, this._prefs.swimlaneOrder, swimlaneScopedKey);
@@ -1321,6 +1344,7 @@ export class KanbanView extends BasesView {
 			onSetActiveCard: (path) => this.setActiveCard(path),
 			onOpenInBackgroundTab: (file) => this.openInBackgroundTab(file),
 			onSetCardProperty: (entry, propId, value) => void this.setCardProperty(entry, propId, value),
+			onPickCardColor: (anchorEl, value) => this.openCardColorPicker(anchorEl, value),
 		};
 	}
 
@@ -1396,6 +1420,65 @@ export class KanbanView extends BasesView {
 				popover.remove();
 				this.activeColorPicker = null;
 			});
+			popover.appendChild(swatch);
+		}
+
+		const rect = anchorEl.getBoundingClientRect();
+		popover.style.top = `${rect.bottom + 4}px`;
+		popover.style.left = `${rect.left}px`;
+		anchorEl.doc.body.appendChild(popover);
+		this.activeColorPicker = popover;
+
+		const dismiss = (e: MouseEvent) => {
+			if (e.target instanceof Node && !popover.contains(e.target) && e.target !== anchorEl) {
+				popover.remove();
+				this.activeColorPicker = null;
+				anchorEl.doc.removeEventListener('click', dismiss);
+			}
+		};
+		anchorEl.doc.addEventListener('click', dismiss);
+	}
+
+	/**
+	 * Color picker for a card-color value (the inline status switcher's dot).
+	 * Choosing a swatch stores an override in _cardColorPrefs; "none" clears it
+	 * and falls back to the emoji/auto-palette color. The board is re-rendered so
+	 * every card holding that value repaints (patch path: the resolved color is
+	 * part of the card fingerprint). Persistence is deferred to close like all
+	 * prefs, so this never triggers the .base-write rebuild flash.
+	 */
+	private openCardColorPicker(anchorEl: HTMLElement, value: string): void {
+		this.activeColorPicker?.remove();
+		this.activeColorPicker = null;
+		if (!value) return;
+
+		const popover = anchorEl.doc.createElement('div');
+		popover.className = CSS_CLASSES.COLUMN_COLOR_POPOVER;
+		const currentOverride = this._cardColorPrefs[value] ?? null;
+
+		const choose = (colorName: string | null): void => {
+			if (colorName) this._cardColorPrefs[value] = colorName;
+			else delete this._cardColorPrefs[value];
+			this._persistPrefs();
+			popover.remove();
+			this.activeColorPicker = null;
+			this.render();
+		};
+
+		const noneSwatch = anchorEl.doc.createElement('div');
+		noneSwatch.className = `${CSS_CLASSES.COLUMN_COLOR_SWATCH} ${CSS_CLASSES.COLUMN_COLOR_NONE}`;
+		if (!currentOverride) noneSwatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
+		noneSwatch.title = t('label.noColor');
+		noneSwatch.addEventListener('click', () => choose(null));
+		popover.appendChild(noneSwatch);
+
+		for (const color of COLOR_PALETTE) {
+			const swatch = anchorEl.doc.createElement('div');
+			swatch.className = CSS_CLASSES.COLUMN_COLOR_SWATCH;
+			swatch.style.background = color.cssVar;
+			swatch.title = color.name;
+			if (currentOverride === color.name) swatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
+			swatch.addEventListener('click', () => choose(color.name));
 			popover.appendChild(swatch);
 		}
 

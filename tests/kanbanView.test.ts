@@ -3990,3 +3990,75 @@ describe('patchColumnCards - property value reactivity', () => {
 		assert.strictEqual(countEl?.textContent, '1', 'Column count should remain 1 after a property-only update');
 	});
 });
+
+describe('Card Color - auto-color and custom override', () => {
+	let scrollEl: HTMLElement;
+	let controller: any;
+	let app: any;
+
+	beforeEach(() => {
+		scrollEl = createDivWithMethods();
+		app = createMockApp();
+	});
+
+	function makeColoredView(): any {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		// Group by status and also color by status so each value drives a card color.
+		controller.config.getAsPropertyId = (key: string) =>
+			key === 'groupByProperty' || key === 'cardColorProperty' ? PROPERTY_STATUS : null;
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		return view;
+	}
+
+	test('every value auto-gets a color even without a leading emoji', () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		// To Do / Doing / Done carry no emoji, yet each resolves to a palette color.
+		for (const value of ['To Do', 'Doing', 'Done']) {
+			const css = (view as any)._cardColorMap.get(value);
+			assert.ok(css && css.startsWith('var(--color-'), `${value} should auto-resolve to a palette color`);
+		}
+	});
+
+	test('a custom override beats the auto palette and persists on close', () => {
+		const view = makeColoredView();
+		triggerDataUpdate(view);
+
+		// Simulate picking a custom color for "To Do".
+		(view as any).openCardColorPicker(scrollEl, 'To Do');
+		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
+		assert.ok(popover, 'card-color picker popover should open');
+		const greenSwatch = Array.from(popover.querySelectorAll('.obk-column-color-swatch')).find(
+			(s) => (s as HTMLElement).title === 'green',
+		) as HTMLElement;
+		assert.ok(greenSwatch, 'green swatch should exist');
+		greenSwatch.click();
+
+		assert.strictEqual(
+			(view as any)._cardColorMap.get('To Do'),
+			'var(--color-green)',
+			'override should win over the auto palette color',
+		);
+
+		// Persistence is deferred to close, scoped by the card-color property.
+		(view as any).onClose();
+		const saved = controller.config.get('cardColors') as Record<string, Record<string, string>> | null;
+		assert.strictEqual(saved?.[PROPERTY_STATUS]?.['To Do'], 'green', 'override should be saved under cardColors');
+	});
+
+	test('choosing "none" clears the override back to auto', () => {
+		const view = makeColoredView();
+		controller.config.set('cardColors', { [PROPERTY_STATUS]: { 'To Do': 'green' } });
+		triggerDataUpdate(view);
+		assert.strictEqual((view as any)._cardColorMap.get('To Do'), 'var(--color-green)', 'starts from saved override');
+
+		(view as any).openCardColorPicker(scrollEl, 'To Do');
+		const popover = document.querySelector('.obk-column-color-popover') as HTMLElement;
+		(popover.querySelector('.obk-column-color-none') as HTMLElement).click();
+
+		assert.strictEqual((view as any)._cardColorPrefs['To Do'], undefined, 'override should be cleared');
+	});
+});

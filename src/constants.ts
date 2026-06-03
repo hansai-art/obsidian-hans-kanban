@@ -103,6 +103,8 @@ export const CSS_CLASSES = {
 	CARD_COLORED: 'obk-card--colored',
 	CARD_STATUS: 'obk-card-status',
 	CARD_STATUS_SELECT: 'obk-card-status-select',
+	/** Clickable color dot before the status switcher; opens the card-color picker. */
+	CARD_COLOR_DOT: 'obk-card-color-dot',
 	CARD_TITLE: 'obk-card-title',
 	CARD_PREVIEW: 'obk-card-preview',
 	CARD_COVER: 'obk-card-cover',

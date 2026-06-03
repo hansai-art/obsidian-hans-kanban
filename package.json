@@ -1,6 +1,6 @@
 {
 	"name": "hans-kanban",
-	"version": "0.11.4",
+	"version": "0.12.0",
 	"description": "A kanban-style drag-and-drop custom view for Obsidian Bases",
 	"main": "main.js",
 	"imports": {

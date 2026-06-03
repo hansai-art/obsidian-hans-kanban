@@ -24,6 +24,7 @@ export const zhTW: Record<StringKey, string> = {
 
 	'label.uncategorized': '未分類',
 	'label.noColor': '無顏色',
+	'label.pickColor': '選擇顏色',
 	'label.minimalMode': '極簡模式（隱藏標籤）',
 	'label.minimalShort': '極簡',
 	'notice.sortedCardOrder': '⚠️ 排序已啟用。清除排序才能在欄內手動調整卡片順序。',
