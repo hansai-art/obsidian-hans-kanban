@@ -1440,6 +1440,13 @@ export class KanbanView extends BasesView {
 
 			animation: SORTABLE_CONFIG.ANIMATION_DURATION,
 
+			// The whole card is draggable (no handle), so a mousedown on the inline
+			// status <select> would otherwise start a drag and the native dropdown
+			// never opens. Exclude it from drag, and preventOnFilter:false so
+			// Sortable does not preventDefault the event the <select> needs to open.
+			filter: `.${CSS_CLASSES.CARD_STATUS_SELECT}`,
+			preventOnFilter: false,
+
 			// require a press-and-hold before drag begins on touch so that
 			// swiping to scroll a column isn't mistaken for a card drag
 			delay: SORTABLE_CONFIG.TOUCH_DELAY,
