@@ -297,6 +297,17 @@ export async function applyRecolor(app: App, propertyName: string, oldValue: str
 	return count;
 }
 
+/** Replace bare-matching entries inside one valuesList record. */
+function replaceValuesListMatches(valuesList: Record<string, unknown>, bare: string, newValue: string): boolean {
+	let touched = false;
+	for (const [key, value] of Object.entries(valuesList)) {
+		if (typeof value !== 'string' || stripLeadingColorEmoji(value.trim()) !== bare) continue;
+		valuesList[key] = newValue;
+		touched = true;
+	}
+	return touched;
+}
+
 /** Replace a matching value inside Metadata Menu's preset-field valuesList. */
 function syncMetadataMenuOption(app: App, propertyName: string, bare: string, newValue: string): void {
 	try {
@@ -315,12 +326,7 @@ function syncMetadataMenuOption(app: App, propertyName: string, bare: string, ne
 			if (!isRecord(field) || field.name !== propertyName) continue;
 			const options = field.options;
 			if (!isRecord(options) || !isRecord(options.valuesList)) continue;
-			const valuesList = options.valuesList;
-			for (const [key, value] of Object.entries(valuesList)) {
-				if (typeof value !== 'string' || stripLeadingColorEmoji(value.trim()) !== bare) continue;
-				valuesList[key] = newValue;
-				touched = true;
-			}
+			if (replaceValuesListMatches(options.valuesList, bare, newValue)) touched = true;
 		}
 		if (!touched) return;
 		const save: unknown = Reflect.get(mm, 'saveSettings');
