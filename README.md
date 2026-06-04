@@ -60,13 +60,49 @@
 
 ---
 
-## 上手後的貼心功能
+## 卡片顏色：打字就好，顏色自動來
 
-- **幫卡片上顏色**：在視圖設定的 **Card color** 選 `狀態`，每一欄的卡片就會有對應顏色。若值的開頭放一個顏色圓點 emoji（例如 `🔴 待辦`、`🟢 完成`），會自動配上紅、綠等顏色。
+這是 Hans Kanban 最核心的功能，搞懂一個觀念就全通了：
+
+> **值開頭的 emoji 就是顏色。** `🔴 初稿`、`🟢 完成` 這種值，外掛看到開頭的 🔴 🟢 就知道要配紅色、綠色。
+
+而且你**不需要自己打 emoji**：
+
+1. 在視圖設定的 **卡片顏色 / 狀態欄位** 選你的狀態欄位（例如 `狀態`）
+2. 之後不管在哪裡輸入新狀態（卡片下拉選單、筆記屬性、其他外掛的選單），只要打純文字（例如 `校稿中`），外掛就**自動幫你配一個還沒用過的顏色**，寫成 `🟣 校稿中` 存進筆記
+3. 共 10 種顏色（紅橙黃綠青藍紫粉棕灰），自動挑「目前用最少」的，所以新狀態不會跟舊狀態撞色
+
+### 固定狀態選項與順序
+
+預設下拉選單只會列出「筆記裡出現過的值」。想固定完整清單跟順序（連還沒有卡片用到的狀態也先列出來），在視圖設定的 **狀態選項（依序）** 把所有狀態照順序填進去，例如：
+
+```
+🔴 待辦
+🟡 進行中
+🟢 完成
+```
+
+之後每張卡的下拉選單都會固定顯示這三項、照這個順序。
+
+### 管理狀態：改名、換色、刪除
+
+按 `Cmd/Ctrl + P` 打開指令面板，輸入並選擇 **管理狀態選項（改名 / 換色 / 刪除）**，會看到所有狀態的管理面板，每個狀態一行：
+
+| 按鈕 | 功能 |
+|---|---|
+| ✏️ 改名 | 改文字，顏色不動。全部用到的筆記、看板設定會一起改好 |
+| 🎨 換色 | 從 24 個 emoji（10 色 × 圓點 / 愛心 / 圖示變體）挑一個新顏色 |
+| 🗑️ 刪除 | 刪掉沒人用的狀態。還有卡片在用的會擋下來，避免誤刪 |
+
+每一行都會顯示「幾張卡片使用中」，所以哪些狀態是孤兒、哪些正在用，一目了然。改名與換色會同步到：筆記內容、看板設定、屬性選單（有裝 Metadata Menu 的話，它的選單也會一起更新）。
+
+## 其他貼心功能
+
 - **直接在卡片上換狀態**：卡片上有個小下拉選單，點一下就能換階段，顏色立刻跟著變，不用拖。
 - **整欄換色**：點欄位標題旁的小圓點可以指定該欄顏色，整欄（外框＋底色）都會跟著變。
 - **調整欄寬**：用滑桿一次調整全部欄寬，或拖某一欄的右邊界單獨調整（雙擊還原）。
 - **極簡模式**：工具列上的「極簡」鈕，一鍵把卡片上的屬性標籤藏起來，畫面更清爽。
+- **範例看板**：指令面板輸入「建立範例看板」，一鍵生出一塊可以玩的示範看板，不會動到你既有的筆記。
 
 ---
 
@@ -96,13 +132,36 @@ Make a few notes with values like `To Do`, `Doing`, `Done`.
 
 **4. Build the board:** Create a Base → add a view → pick **Hans Kanban** as the type → set **Group by** to `status`. Columns appear automatically. Drag a card to another column and its `status` updates.
 
+### Card colors: just type, colors come automatically
+
+One idea explains the whole color system: **the leading emoji in a value IS its color.** `🔴 Draft` is red, `🟢 Done` is green.
+
+You never have to type the emoji yourself:
+
+1. Set **Card color / status property** in the view options to your status property.
+2. From then on, whenever you type a plain new status anywhere (the on-card dropdown, note properties, other plugins' menus), the plugin picks a **least-used** color from a 10-color palette (red, orange, yellow, green, cyan, blue, purple, pink, brown, gray) and saves it as e.g. `🟣 Reviewing`. New statuses never collide with colors already taken.
+
+### Fixed option list and order
+
+By default the dropdown only lists values that already exist in your notes. To pin the full list and its order (including statuses no card uses yet), fill in **Status options (ordered)** in the view options, one value per line, e.g. `🔴 To Do`, `🟡 Doing`, `🟢 Done`.
+
+### Manage statuses: rename / recolor / delete
+
+Command palette → **Manage status options (rename / recolor / delete)** opens a panel listing every status with its usage count:
+
+- ✏️ **Rename**: changes the text, keeps the color, and rewrites every note plus the board config.
+- 🎨 **Recolor**: pick from 24 emoji (10 colors in dot / heart / icon variants).
+- 🗑️ **Delete**: removes an unused status everywhere; statuses still in use are protected.
+
+Renames and recolors also sync to the property suggester and, if you use the Metadata Menu plugin, to its select menus.
+
 ### Nice extras
 
-- **Card color**: set **Card color** to your status property; a leading color emoji (🔴/🟢) maps to that color automatically, otherwise a stable palette is used.
 - **On-card switch**: a dropdown on each card switches the value and recolors instantly.
 - **Whole-column color**: pick a color from the dot next to a column title; the outline and body tint to match.
 - **Column width**: a global slider, plus a per-column drag handle (double-click to reset).
 - **Minimal mode**: a toolbar toggle hides per-card property labels for a cleaner board.
+- **Demo board**: command palette → "Create demo board" builds a playground board without touching your notes.
 
 ## Development
 
