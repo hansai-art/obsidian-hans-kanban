@@ -134,6 +134,10 @@ export class KanbanView extends BasesView {
 	/** Per-render cache: distinct card-color values + value→css-color map. */
 	private _cardColorValues: string[] = [];
 	private _cardColorMap: Map<string, string> = new Map();
+	/** Per-render cache: value→resolved palette color name (mirrors _cardColorMap). */
+	private _cardColorNames: Map<string, string> = new Map();
+	/** Per-render usage count per palette color, so new values pick the least-used one. */
+	private _cardColorCounts: Map<string, number> = new Map();
 	/**
 	 * User color overrides for card-color values (value → palette color name),
 	 * scoped to the current cardColorPropertyId. Takes priority over the leading
@@ -299,8 +303,9 @@ export class KanbanView extends BasesView {
 	/**
 	 * Build the value→color map and distinct-value list for the card-color
 	 * property. Each distinct value gets a color: a user override wins, else a
-	 * leading color emoji (🔴 → red), else palette-by-sorted-index so colors stay
-	 * stable. Every value therefore always resolves to a color (never blank).
+	 * leading color emoji (🔴 → red), else the least-used palette color so new
+	 * values avoid colors already taken (instead of colliding by index). Every
+	 * value therefore always resolves to a color (never blank).
 	 */
 	private _computeCardColors(entries: BasesEntry[]): void {
 		this._cardColorValues = [];
@@ -337,14 +342,47 @@ export class KanbanView extends BasesView {
 		const values = configured.length > 0 ? [...configured, ...extras] : [...seen].sort();
 		this._cardColorValues = values;
 
-		values.forEach((value, index) => {
+		// First pass: values with an explicit color (override or leading emoji)
+		// claim their color and bump its usage count.
+		this._cardColorNames = new Map();
+		this._cardColorCounts = new Map();
+		const explicit = new Map<string, string>();
+		for (const value of values) {
 			const override = this._cardColorPrefs[value];
 			const leadEmoji = [...value][0] ?? '';
-			const emojiColor = EMOJI_COLOR_MAP[leadEmoji];
-			const colorName = override ?? emojiColor ?? COLOR_PALETTE[index % COLOR_PALETTE.length].name;
+			const colorName = override ?? EMOJI_COLOR_MAP[leadEmoji];
+			if (colorName) {
+				explicit.set(value, colorName);
+				this._cardColorCounts.set(colorName, (this._cardColorCounts.get(colorName) ?? 0) + 1);
+			}
+		}
+
+		// Second pass: emoji-less values each take the least-used palette color
+		// (in list order, so assignment stays deterministic across renders).
+		for (const value of values) {
+			let colorName = explicit.get(value);
+			if (!colorName) {
+				colorName = this._leastUsedColorName();
+				this._cardColorCounts.set(colorName, (this._cardColorCounts.get(colorName) ?? 0) + 1);
+			}
+			this._cardColorNames.set(value, colorName);
 			const paletteEntry = COLOR_PALETTE.find((c) => c.name === colorName);
 			if (paletteEntry) this._cardColorMap.set(value, paletteEntry.cssVar);
-		});
+		}
+	}
+
+	/** First palette color with the lowest current usage count. */
+	private _leastUsedColorName(): string {
+		let best: string = COLOR_PALETTE[0].name;
+		let bestCount = Number.POSITIVE_INFINITY;
+		for (const color of COLOR_PALETTE) {
+			const count = this._cardColorCounts.get(color.name) ?? 0;
+			if (count < bestCount) {
+				best = color.name;
+				bestCount = count;
+			}
+		}
+		return best;
 	}
 
 	private triggerHoverPreview(linktext: string, sourcePath: string, event: MouseEvent, targetEl: HTMLElement): void {
@@ -1434,18 +1472,18 @@ export class KanbanView extends BasesView {
 	 * Return the value prefixed with its resolved palette color emoji (e.g.
 	 * "有嗎" → "🟣 有嗎"). If the value already begins with a recognized color
 	 * emoji it is returned unchanged. Resolution mirrors _computeCardColors:
-	 * user override wins, else palette-by-index over the current value list.
+	 * user override wins, else the render-time assignment, else the least-used
+	 * palette color (so brand-new values avoid colors already on the board).
 	 */
 	private _withColorEmoji(value: string): string {
 		if (!value.trim()) return value; // nothing to color (empty / emoji-only leftovers)
 		const leadEmoji = [...value][0] ?? '';
 		if (EMOJI_COLOR_MAP[leadEmoji]) return value;
-		const override = this._cardColorPrefs[value];
-		let colorName = override;
+		let colorName = this._cardColorPrefs[value] ?? this._cardColorNames.get(value);
 		if (!colorName) {
-			let index = this._cardColorValues.indexOf(value);
-			if (index < 0) index = this._cardColorValues.length;
-			colorName = COLOR_PALETTE[index % COLOR_PALETTE.length].name;
+			colorName = this._leastUsedColorName();
+			// Reserve it so a burst of new values spreads across the palette.
+			this._cardColorCounts.set(colorName, (this._cardColorCounts.get(colorName) ?? 0) + 1);
 		}
 		const emoji = COLOR_NAME_TO_EMOJI[colorName];
 		return emoji ? `${emoji} ${value}` : value;

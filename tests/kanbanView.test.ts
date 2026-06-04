@@ -4038,6 +4038,37 @@ describe('Card Color - auto-color and custom override', () => {
 
 	const KNOWN_EMOJIS = Object.values(COLOR_NAME_TO_EMOJI);
 
+	test('a new emoji-less value gets the least-used color, not a duplicate', () => {
+		// Red is taken twice (two explicit 🔴 values); "新增的" must avoid red.
+		const controller2: any = createMockQueryController(
+			[
+				createMockBasesEntry(createMockTFile('A.md'), { [PROPERTY_STATUS]: '🔴 講義' }),
+				createMockBasesEntry(createMockTFile('B.md'), { [PROPERTY_STATUS]: '🔴 拍攝腳本 (操作)' }),
+				createMockBasesEntry(createMockTFile('C.md'), { [PROPERTY_STATUS]: '新增的' }),
+			],
+			TEST_PROPERTIES,
+		);
+		controller2.app = app;
+		controller2.config.getAsPropertyId = (key: string) =>
+			key === 'groupByProperty' || key === 'cardColorProperty' ? PROPERTY_STATUS : null;
+		const view = new KanbanView(controller2, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		assert.strictEqual(
+			(view as any)._cardColorNames.get('新增的'),
+			'orange',
+			'new value should take the first unused palette color, not red again',
+		);
+	});
+
+	test('a burst of brand-new values spreads across the palette', () => {
+		const view = makeRenderedView();
+		const first = (view as any)._withColorEmoji('全新值一');
+		const second = (view as any)._withColorEmoji('全新值二');
+		assert.notStrictEqual([...first][0], [...second][0], 'two new values must not share a color emoji');
+	});
+
 	test('_withColorEmoji leaves empty / whitespace-only values unchanged', () => {
 		const view = makeRenderedView();
 		assert.strictEqual((view as any)._withColorEmoji(''), '', 'empty stays empty');
