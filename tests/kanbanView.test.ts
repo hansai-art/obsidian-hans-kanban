@@ -4330,6 +4330,28 @@ describe('Card Color - auto-color and custom override', () => {
 		assert.strictEqual(counts.get('沒人用'), undefined, 'unused value absent from the map');
 	});
 
+	test('a cleared property (Value stringifying to "null") never becomes a switcher option', () => {
+		const controller2: any = createMockQueryController(
+			[
+				createMockBasesEntry(createMockTFile('A.md'), { [PROPERTY_STATUS]: '🔴 講義' }),
+				createMockBasesEntry(createMockTFile('B.md'), { [PROPERTY_STATUS]: 'null' }), // cleared value wrapper
+			],
+			TEST_PROPERTIES,
+		);
+		controller2.app = app;
+		controller2.config.getAsPropertyId = (key: string) =>
+			key === 'groupByProperty' || key === 'cardColorProperty' ? PROPERTY_STATUS : null;
+		const view = new KanbanView(controller2, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		controller2.config.set('cardColorOrder', ['🔴 講義']);
+		triggerDataUpdate(view);
+
+		assert.ok(!(view as any)._cardColorValues.includes('null'), 'no phantom "null" switcher option');
+		assert.ok(!(view as any)._suggesterValues.includes('null'), 'no phantom "null" suggester option');
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'sweep never tries to color "null"');
+		restorePropertySuggester();
+	});
+
 	test('with all 8 classic colors taken, new values get brown then gray (no repeats)', () => {
 		const taken = ['🔴 a', '🟠 b', '🟡 c', '🟢 d', '🔵 e', '🟣 f', '🩵 g', '🩷 h'];
 		const controller2: any = createMockQueryController(

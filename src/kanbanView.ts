@@ -726,13 +726,16 @@ export class KanbanView extends BasesView {
 			this._cardColorPrefs = { ...(all[this.cardColorPropertyId] ?? {}) };
 		}
 
-		// Values actually present in the data.
+		// Values actually present in the data. A Bases Value wrapper is truthy
+		// even when its inner data is null (a card whose property was cleared),
+		// and then stringifies to the literal "null" — skip it, or every card's
+		// switcher grows a phantom "null" option.
 		const seen = new Set<string>();
 		for (const entry of entries) {
 			const value = entry.getValue(this.cardColorPropertyId);
 			if (!value) continue;
 			const raw = value.toString().trim();
-			if (!raw || seen.has(raw)) continue;
+			if (!raw || raw === 'null' || seen.has(raw)) continue;
 			seen.add(raw);
 		}
 
@@ -1947,7 +1950,9 @@ export class KanbanView extends BasesView {
 		const propertyName = parsed.name;
 		for (const entry of entries) {
 			const raw = entry.getValue(this.cardColorPropertyId)?.toString().trim() ?? '';
-			if (!raw) continue;
+			// "null" = a truthy Value wrapper around cleared/absent data; nothing
+			// to color (and the in-note guard below would reject the write anyway).
+			if (!raw || raw === 'null') continue;
 			const leadEmoji = [...raw][0] ?? '';
 			if (EMOJI_COLOR_MAP[leadEmoji]) continue; // already colored
 			const colored = this._withColorEmoji(raw);
