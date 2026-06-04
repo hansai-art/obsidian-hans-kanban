@@ -4062,6 +4062,32 @@ describe('Card Color - auto-color and custom override', () => {
 		);
 	});
 
+	test('native property suggester offers the full option list while the board is open', () => {
+		// Vault-wide in-use values, as Obsidian's internal API would report them.
+		const vaultValues = ['🔵 拍攝腳本', '不在看板的值'];
+		(app.metadataCache as any).getFrontmatterPropertyValuesForKey = (_key: string) => [...vaultValues];
+
+		const view = makeColoredView();
+		controller.config.set('cardColorOrder', ['🔴 講義', '🟠 簡報', '🟡 簡報確認']);
+		triggerDataUpdate(view);
+
+		const patched = (app.metadataCache as any).getFrontmatterPropertyValuesForKey;
+		const merged = patched('status');
+		assert.deepStrictEqual(
+			merged.slice(0, 3),
+			['🔴 講義', '🟠 簡報', '🟡 簡報確認'],
+			'configured options lead the suggester list',
+		);
+		assert.ok(merged.includes('不在看板的值'), 'in-use vault values are kept');
+		assert.strictEqual(new Set(merged).size, merged.length, 'no duplicates');
+		assert.deepStrictEqual(patched('other'), vaultValues, 'unrelated properties stay untouched');
+
+		// Closing the last board restores the original function.
+		view.onClose();
+		const restored = (app.metadataCache as any).getFrontmatterPropertyValuesForKey;
+		assert.deepStrictEqual(restored('status'), vaultValues, 'original suggester restored after close');
+	});
+
 	test('with all 8 classic colors taken, new values get brown then gray (no repeats)', () => {
 		const taken = ['🔴 a', '🟠 b', '🟡 c', '🟢 d', '🔵 e', '🟣 f', '🩵 g', '🩷 h'];
 		const controller2: any = createMockQueryController(

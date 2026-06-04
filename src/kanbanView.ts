@@ -83,6 +83,21 @@ function isStringArray(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
+/**
+ * Obsidian's native property-value suggester is fed by the (internal)
+ * `metadataCache.getFrontmatterPropertyValuesForKey`, which only returns
+ * values currently in use across the vault — so configured-but-unused
+ * card-color options never show up there. Open kanban views register here as
+ * providers and a wrapper merges their full option list (configured order
+ * first, then in-use extras) into the suggester for their color property.
+ * The original function is restored when the last provider closes.
+ */
+const SUGGESTER_FN_KEY = 'getFrontmatterPropertyValuesForKey';
+type PropertyValuesFn = (key: string) => unknown;
+const isPropertyValuesFn = (value: unknown): value is PropertyValuesFn => typeof value === 'function';
+const suggesterProviders = new Set<KanbanView>();
+let suggesterPatch: { cache: object; original: PropertyValuesFn } | null = null;
+
 function isStringArrayRecord(value: unknown): value is Record<string, string[]> {
 	return isRecord(value) && !Array.isArray(value) && Object.values(value).every(isStringArray);
 }
@@ -385,6 +400,55 @@ export class KanbanView extends BasesView {
 		return best;
 	}
 
+	/** Bare frontmatter key of the card-color property (e.g. "phase"), if any. */
+	private _suggesterPropertyName(): string | null {
+		if (!this.cardColorPropertyId) return null;
+		const parsed = parsePropertyId(this.cardColorPropertyId);
+		return parsed.type === 'note' && parsed.name ? parsed.name : null;
+	}
+
+	/**
+	 * Register this view as a suggester provider and install the merge wrapper
+	 * on the metadataCache if not yet installed (see suggesterProviders above).
+	 * No-op on hosts that don't expose the internal API.
+	 */
+	private _patchPropertySuggester(): void {
+		const cache = this.app?.metadataCache;
+		if (!cache) return;
+		const current: unknown = Reflect.get(cache, SUGGESTER_FN_KEY);
+		if (!isPropertyValuesFn(current)) return;
+		suggesterProviders.add(this);
+		if (suggesterPatch) return;
+		const original = current;
+		const wrapper = (key: string): unknown => {
+			const raw: unknown = original.call(cache, key);
+			const base: unknown[] = Array.isArray(raw) ? raw : [];
+			const merged: unknown[] = [];
+			for (const view of suggesterProviders) {
+				if (view._suggesterPropertyName() !== key) continue;
+				for (const value of view._cardColorValues) {
+					if (!merged.includes(value)) merged.push(value);
+				}
+			}
+			if (merged.length === 0) return raw;
+			for (const value of base) {
+				if (!merged.includes(value)) merged.push(value);
+			}
+			return merged;
+		};
+		Reflect.set(cache, SUGGESTER_FN_KEY, wrapper);
+		suggesterPatch = { cache, original };
+	}
+
+	/** Drop this view as a provider; restore the original when none remain. */
+	private _unpatchPropertySuggester(): void {
+		suggesterProviders.delete(this);
+		if (suggesterProviders.size === 0 && suggesterPatch) {
+			Reflect.set(suggesterPatch.cache, SUGGESTER_FN_KEY, suggesterPatch.original);
+			suggesterPatch = null;
+		}
+	}
+
 	private triggerHoverPreview(linktext: string, sourcePath: string, event: MouseEvent, targetEl: HTMLElement): void {
 		this.app?.workspace.trigger('hover-link', {
 			event,
@@ -601,6 +665,10 @@ export class KanbanView extends BasesView {
 
 			// Distinct values + color map for the card-color / status property.
 			this._computeCardColors(entries);
+
+			// Feed the full option list to Obsidian's native property-value
+			// suggester so both menus offer the same choices.
+			if (this.cardColorPropertyId) this._patchPropertySuggester();
 
 			// Catch-up pass: color any raw value already sitting on the board, e.g.
 			// typed while the board was closed (the metadataCache listener only lives
@@ -2032,6 +2100,7 @@ export class KanbanView extends BasesView {
 			this._metadataChangeRef = null;
 		}
 		this._debouncedRender.cancel();
+		this._unpatchPropertySuggester();
 		// Flush any in-session pref changes (card/column order, colors, widths) to
 		// the .base config now. We deliberately never write config during a session
 		// because each write makes the Bases host rebuild the whole view (a visible
