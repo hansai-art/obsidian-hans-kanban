@@ -12,7 +12,15 @@ import {
 	SORTED_CARD_ORDER_NOTICE,
 	UNCATEGORIZED_LABEL,
 } from '../src/constants.ts';
-import { isCardOrders, KanbanView, registerGlobalAutoColor, restorePropertySuggester } from '../src/kanbanView.ts';
+import {
+	isCardOrders,
+	KanbanView,
+	installWriteTimeAutoColor,
+	registerGlobalAutoColor,
+	restorePropertySuggester,
+	restoreWriteTimeAutoColor,
+	setSuggesterOptionsPersistence,
+} from '../src/kanbanView.ts';
 import { normalizePropertyValue } from '../src/utils/grouping.ts';
 import {
 	createEmptyEntries,
@@ -4100,6 +4108,75 @@ describe('Card Color - auto-color and custom override', () => {
 		restorePropertySuggester();
 		const restored = (app.metadataCache as any).getFrontmatterPropertyValuesForKey;
 		assert.deepStrictEqual(restored('status'), vaultValues, 'original suggester restored on plugin unload');
+	});
+
+	test('write-time patch colors a raw value inside the same processFrontMatter write', async () => {
+		makeRenderedView(); // registers 'status' in the option cache
+		const recorder = app.fileManager.processFrontMatter; // original mock keeps .calls
+		recorder.calls.length = 0;
+		installWriteTimeAutoColor(app);
+		try {
+			// Simulate a third-party UI (e.g. Metadata Menu) saving a raw value.
+			await app.fileManager.processFrontMatter({ path: 'X.md' }, (fm: Record<string, unknown>) => {
+				fm.status = '第三方寫入';
+			});
+			assert.strictEqual(recorder.calls.length, 1, 'write goes through the original');
+			const fm: Record<string, unknown> = {};
+			await recorder.calls[0][1](fm); // run the shimmed callback
+			const written = fm.status as string;
+			assert.ok(
+				written.endsWith(' 第三方寫入') && KNOWN_EMOJIS.includes([...written][0]),
+				`value must be colored inside the write itself, got "${written}"`,
+			);
+		} finally {
+			restoreWriteTimeAutoColor();
+		}
+	});
+
+	test('raw in-data extras never enter the suggester option cache (ghost regression)', () => {
+		(app.metadataCache as any).getFrontmatterPropertyValuesForKey = (_key: string): string[] => [];
+		const controller2: any = createMockQueryController(
+			[
+				createMockBasesEntry(createMockTFile('A.md'), { [PROPERTY_STATUS]: '🔴 講義' }),
+				createMockBasesEntry(createMockTFile('B.md'), { [PROPERTY_STATUS]: '後天' }), // raw, pre-sweep
+			],
+			TEST_PROPERTIES,
+		);
+		controller2.app = app;
+		controller2.config.getAsPropertyId = (key: string) =>
+			key === 'groupByProperty' || key === 'cardColorProperty' ? PROPERTY_STATUS : null;
+		const view = new KanbanView(controller2, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		controller2.config.set('cardColorOrder', ['🔴 講義', '🟠 簡報']);
+		triggerDataUpdate(view);
+
+		const patched = (app.metadataCache as any).getFrontmatterPropertyValuesForKey;
+		const merged = patched('status');
+		assert.ok(!merged.includes('後天'), 'raw in-data value must not be cached as a menu option');
+		assert.deepStrictEqual(merged, ['🔴 講義', '🟠 簡報'], 'only configured + colored extras remain');
+		restorePropertySuggester();
+	});
+
+	test('persisted options seed the cache so auto-color works before any board render', async () => {
+		restorePropertySuggester(); // fresh module state, as at app startup
+		let saved: Record<string, string[]> | null = null;
+		setSuggesterOptionsPersistence({ seeded_prop: ['🔴 甲'] }, (options) => {
+			saved = options;
+		});
+
+		// No board has rendered: the seeded options alone drive the listener.
+		const ref: any = registerGlobalAutoColor(app);
+		await ref.callback({ path: 'S.md' }, null, { frontmatter: { seeded_prop: '乙' } });
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 1, 'seeded property is auto-colored');
+		const fm: Record<string, unknown> = { seeded_prop: '乙' };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(fm.seeded_prop, '🟠 乙', 'least-used among seeded options (red taken) is orange');
+
+		// A board render updates the cache and fires the persistence callback.
+		makeRenderedView();
+		assert.ok(saved !== null && 'status' in (saved as object), 'render persists the refreshed option map');
+		restorePropertySuggester();
 	});
 
 	test('with all 8 classic colors taken, new values get brown then gray (no repeats)', () => {

@@ -8,8 +8,12 @@ import {
 	isRecord,
 	isColumnOrders,
 	isColumnColors,
+	installPropertySuggesterPatch,
+	installWriteTimeAutoColor,
 	registerGlobalAutoColor,
 	restorePropertySuggester,
+	restoreWriteTimeAutoColor,
+	setSuggesterOptionsPersistence,
 } from './kanbanView.ts';
 
 export const KANBAN_VIEW_TYPE = 'hans-kanban-view';
@@ -76,6 +80,17 @@ export default class KanbanBasesViewPlugin extends Plugin {
 		const autoColorRef = registerGlobalAutoColor(this.app);
 		if (autoColorRef) this.registerEvent(autoColorRef);
 
+		// Option lists persisted from previous sessions make the suggester patch,
+		// the write-time patch and the auto-color listener effective from app
+		// startup — no board render needed first. Board renders keep them fresh.
+		const data = isRecord(raw) ? { ...raw } : {};
+		setSuggesterOptionsPersistence(data.suggesterOptions, (options) => {
+			data.suggesterOptions = options;
+			void this.saveData(data);
+		});
+		installPropertySuggesterPatch(this.app);
+		installWriteTimeAutoColor(this.app);
+
 		// One-click sample board, always available from the command palette.
 		this.addCommand({
 			id: 'create-demo-board',
@@ -88,9 +103,9 @@ export default class KanbanBasesViewPlugin extends Plugin {
 		// First run after install: offer the demo board once. We merge the flag
 		// into existing data so any not-yet-migrated legacy column state survives,
 		// and record it before showing the modal so it never nags twice.
-		const data = isRecord(raw) ? raw : {};
 		if (!data.demoPrompted) {
-			await this.saveData({ ...data, demoPrompted: true });
+			data.demoPrompted = true;
+			await this.saveData(data);
 			this.app.workspace.onLayoutReady(() => {
 				new DemoPromptModal(this.app, () => {
 					void createDemoBoard(this.app);
@@ -100,9 +115,10 @@ export default class KanbanBasesViewPlugin extends Plugin {
 	}
 
 	onunload() {
-		// Hand Obsidian's property-value suggester back to its original
-		// implementation (boards keep it patched across view close, see
-		// kanbanView.ts).
+		// Hand Obsidian's property-value suggester and processFrontMatter back to
+		// their original implementations (boards keep them patched across view
+		// close, see kanbanView.ts).
 		restorePropertySuggester();
+		restoreWriteTimeAutoColor();
 	}
 }

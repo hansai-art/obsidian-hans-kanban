@@ -103,13 +103,121 @@ type PropertyValuesFn = (key: string) => unknown;
 const isPropertyValuesFn = (value: unknown): value is PropertyValuesFn => typeof value === 'function';
 const suggesterOptions = new Map<string, string[]>();
 let suggesterPatch: { cache: object; original: PropertyValuesFn } | null = null;
+let suggesterPersist: ((options: Record<string, string[]>) => void) | null = null;
 
 /** Restore the original suggester function. Call only on plugin unload. */
 export function restorePropertySuggester(): void {
 	suggesterOptions.clear();
+	suggesterPersist = null;
 	if (suggesterPatch) {
 		Reflect.set(suggesterPatch.cache, SUGGESTER_FN_KEY, suggesterPatch.original);
 		suggesterPatch = null;
+	}
+}
+
+/**
+ * Seed the option cache from plugin data saved in a previous session and
+ * register the persistence callback. With this, the suggester patch and the
+ * auto-color paths work from app startup — no board render needed first.
+ * Live board renders still take precedence over seeded values.
+ */
+export function setSuggesterOptionsPersistence(
+	seed: unknown,
+	persist: (options: Record<string, string[]>) => void,
+): void {
+	if (isStringArrayRecord(seed)) {
+		for (const [key, values] of Object.entries(seed)) {
+			if (!suggesterOptions.has(key)) suggesterOptions.set(key, [...values]);
+		}
+	}
+	suggesterPersist = persist;
+}
+
+function persistSuggesterOptions(): void {
+	suggesterPersist?.(Object.fromEntries(suggesterOptions));
+}
+
+/**
+ * Install the suggester merge wrapper on the metadataCache. Idempotent;
+ * called at plugin load (so persisted options work immediately) and from
+ * every board render. No-op on hosts without the internal API.
+ */
+export function installPropertySuggesterPatch(app: App): void {
+	if (suggesterPatch) return;
+	const cache = app.metadataCache;
+	if (!cache) return;
+	const current: unknown = Reflect.get(cache, SUGGESTER_FN_KEY);
+	if (!isPropertyValuesFn(current)) return;
+	const original = current;
+	const wrapper = (key: string): unknown => {
+		const raw: unknown = original.call(cache, key);
+		const options = suggesterOptions.get(key);
+		if (!options || options.length === 0) return raw;
+		const base: unknown[] = Array.isArray(raw) ? raw : [];
+		const merged: unknown[] = [...options];
+		for (const value of base) {
+			if (merged.includes(value)) continue;
+			// Color properties only offer colored values. Emoji-less entries in
+			// the vault index are transient by design (the write-time patch and
+			// the auto-color listener rewrite them) or stale session ghosts —
+			// either way, showing them would duplicate their colored twin.
+			if (typeof value === 'string' && !EMOJI_COLOR_MAP[[...value][0] ?? '']) continue;
+			merged.push(value);
+		}
+		return merged;
+	};
+	Reflect.set(cache, SUGGESTER_FN_KEY, wrapper);
+	suggesterPatch = { cache, original };
+}
+
+/**
+ * Write-time auto-color: wrap fileManager.processFrontMatter so any write
+ * that leaves a registered card-color property holding a raw (emoji-less)
+ * value gets the color emoji prepended INSIDE the same write — no transient
+ * raw value ever hits disk or the metadata index. This is what makes values
+ * picked through third-party property UIs (e.g. Metadata Menu's modal)
+ * colored instantly instead of one metadata-event later.
+ */
+const FRONTMATTER_FN_KEY = 'processFrontMatter';
+type ProcessFrontMatterFn = (
+	file: unknown,
+	fn: (frontmatter: Record<string, unknown>) => unknown,
+	...rest: unknown[]
+) => unknown;
+const isProcessFrontMatterFn = (value: unknown): value is ProcessFrontMatterFn => typeof value === 'function';
+let frontmatterPatch: { manager: object; original: ProcessFrontMatterFn } | null = null;
+
+export function installWriteTimeAutoColor(app: App): void {
+	if (frontmatterPatch) return;
+	const manager = app.fileManager;
+	if (!manager) return;
+	const current: unknown = Reflect.get(manager, FRONTMATTER_FN_KEY);
+	if (!isProcessFrontMatterFn(current)) return;
+	const original = current;
+	const wrapper: ProcessFrontMatterFn = (file, fn, ...rest) => {
+		const shimmed = (frontmatter: Record<string, unknown>): unknown => {
+			const result = fn(frontmatter);
+			for (const [propertyName, options] of suggesterOptions) {
+				const raw = frontmatterString(frontmatter[propertyName]);
+				if (raw === null) continue;
+				const value = raw.trim();
+				if (!value || EMOJI_COLOR_MAP[[...value][0] ?? '']) continue;
+				const emoji = leastUsedEmojiAmong(options);
+				if (emoji) frontmatter[propertyName] = `${emoji} ${value}`;
+			}
+			return result;
+		};
+		return original.call(manager, file, shimmed, ...rest);
+	};
+	Reflect.set(manager, FRONTMATTER_FN_KEY, wrapper);
+	frontmatterPatch = { manager, original };
+}
+
+/** Restore the original processFrontMatter. Call only on plugin unload. */
+export function restoreWriteTimeAutoColor(): void {
+	if (frontmatterPatch) {
+		Reflect.set(frontmatterPatch.manager, FRONTMATTER_FN_KEY, frontmatterPatch.original);
+		frontmatterPatch = null;
 	}
 }
 
@@ -231,6 +339,8 @@ export class KanbanView extends BasesView {
 	private _lastCardColorOrderKey = '[]';
 	/** Per-render cache: distinct card-color values + value→css-color map. */
 	private _cardColorValues: string[] = [];
+	/** Subset for the suggester/auto-color cache: configured + colored extras. */
+	private _suggesterValues: string[] = [];
 	private _cardColorMap: Map<string, string> = new Map();
 	/** Per-render cache: value→resolved palette color name (mirrors _cardColorMap). */
 	private _cardColorNames: Map<string, string> = new Map();
@@ -430,6 +540,12 @@ export class KanbanView extends BasesView {
 		const values = configured.length > 0 ? [...configured, ...extras] : [...seen].sort();
 		this._cardColorValues = values;
 
+		// What the suggester/auto-color cache gets: configured options as-is plus
+		// only the COLORED in-data extras. Raw extras are transient by design
+		// (the write-time patch / auto-color listener rewrites them) — caching
+		// one would resurface it as a ghost menu entry after it's been recolored.
+		this._suggesterValues = [...configured, ...extras.filter((v) => EMOJI_COLOR_MAP[[...v][0] ?? ''])];
+
 		// First pass: values with an explicit color (override or leading emoji)
 		// claim their color and bump its usage count.
 		this._cardColorNames = new Map();
@@ -481,41 +597,20 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * Store this board's full option list in the module-level cache and install
-	 * the merge wrapper on the metadataCache if not yet installed (see
-	 * suggesterOptions above). No-op on hosts without the internal API.
+	 * Refresh this board's option list in the module-level cache (persisting it
+	 * when it changed) and make sure the suggester wrapper is installed.
 	 */
 	private _patchPropertySuggester(): void {
 		const propertyName = this._suggesterPropertyName();
-		if (!propertyName) return;
-		// Always refresh the option cache: the global auto-color listener and the
-		// suggester wrapper both read it, even when the patch can't install.
-		suggesterOptions.set(propertyName, [...this._cardColorValues]);
-		const cache = this.app?.metadataCache;
-		if (!cache) return;
-		const current: unknown = Reflect.get(cache, SUGGESTER_FN_KEY);
-		if (!isPropertyValuesFn(current)) return;
-		if (suggesterPatch) return;
-		const original = current;
-		const wrapper = (key: string): unknown => {
-			const raw: unknown = original.call(cache, key);
-			const options = suggesterOptions.get(key);
-			if (!options || options.length === 0) return raw;
-			const base: unknown[] = Array.isArray(raw) ? raw : [];
-			const merged: unknown[] = [...options];
-			for (const value of base) {
-				if (merged.includes(value)) continue;
-				// Color properties only offer colored values. Emoji-less entries in
-				// the vault index are transient by design (the global auto-color
-				// listener rewrites them within seconds) or stale session ghosts —
-				// either way, showing them would duplicate their colored twin.
-				if (typeof value === 'string' && !EMOJI_COLOR_MAP[[...value][0] ?? '']) continue;
-				merged.push(value);
-			}
-			return merged;
-		};
-		Reflect.set(cache, SUGGESTER_FN_KEY, wrapper);
-		suggesterPatch = { cache, original };
+		if (!propertyName || !this.app) return;
+		// The cache feeds the suggester wrapper, the write-time patch and the
+		// global auto-color listener — refresh it on every render.
+		const next = this._suggesterValues;
+		const prev = suggesterOptions.get(propertyName);
+		const changed = !prev || prev.length !== next.length || prev.some((value, i) => value !== next[i]);
+		suggesterOptions.set(propertyName, [...next]);
+		if (changed) persistSuggesterOptions();
+		installPropertySuggesterPatch(this.app);
 	}
 
 	private triggerHoverPreview(linktext: string, sourcePath: string, event: MouseEvent, targetEl: HTMLElement): void {
