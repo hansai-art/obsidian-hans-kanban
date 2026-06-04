@@ -504,7 +504,13 @@ export class KanbanView extends BasesView {
 			const base: unknown[] = Array.isArray(raw) ? raw : [];
 			const merged: unknown[] = [...options];
 			for (const value of base) {
-				if (!merged.includes(value)) merged.push(value);
+				if (merged.includes(value)) continue;
+				// Color properties only offer colored values. Emoji-less entries in
+				// the vault index are transient by design (the global auto-color
+				// listener rewrites them within seconds) or stale session ghosts —
+				// either way, showing them would duplicate their colored twin.
+				if (typeof value === 'string' && !EMOJI_COLOR_MAP[[...value][0] ?? '']) continue;
+				merged.push(value);
 			}
 			return merged;
 		};

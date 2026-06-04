@@ -4064,7 +4064,9 @@ describe('Card Color - auto-color and custom override', () => {
 
 	test('native property suggester offers the full option list while the board is open', () => {
 		// Vault-wide in-use values, as Obsidian's internal API would report them.
-		const vaultValues = ['🔵 拍攝腳本', '不在看板的值'];
+		// '裸值殘影' simulates a transient emoji-less ghost left in the session
+		// index before the auto-color listener rewrote it.
+		const vaultValues = ['🔵 拍攝腳本', '🟤 額外已上色', '裸值殘影'];
 		(app.metadataCache as any).getFrontmatterPropertyValuesForKey = (_key: string) => [...vaultValues];
 
 		const view = makeColoredView();
@@ -4078,7 +4080,8 @@ describe('Card Color - auto-color and custom override', () => {
 			['🔴 講義', '🟠 簡報', '🟡 簡報確認'],
 			'configured options lead the suggester list',
 		);
-		assert.ok(merged.includes('不在看板的值'), 'in-use vault values are kept');
+		assert.ok(merged.includes('🟤 額外已上色'), 'colored in-use vault values are kept');
+		assert.ok(!merged.includes('裸值殘影'), 'emoji-less ghosts are filtered out');
 		assert.strictEqual(new Set(merged).size, merged.length, 'no duplicates');
 		assert.deepStrictEqual(patched('other'), vaultValues, 'unrelated properties stay untouched');
 
