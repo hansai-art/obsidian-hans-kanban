@@ -13,7 +13,10 @@ import {
 	UNCATEGORIZED_LABEL,
 } from '../src/constants.ts';
 import {
+	applyDeleteOption,
 	applyRecolor,
+	applyRename,
+	countValueUsage,
 	getRegisteredColorOptions,
 	isCardOrders,
 	KanbanView,
@@ -4229,6 +4232,102 @@ describe('Card Color - auto-color and custom override', () => {
 		assert.strictEqual(mmValues['2'], '🟢 其他', 'unrelated Metadata Menu option untouched');
 		assert.ok(mmSaved, 'Metadata Menu settings saved');
 		restorePropertySuggester();
+	});
+
+	test('applyRename keeps the leading emoji and rewrites matching notes', async () => {
+		restorePropertySuggester();
+		const view = makeColoredView();
+		controller.config.set('cardColorOrder', ['🟡 簡報確認', '🟢 其他']);
+		triggerDataUpdate(view);
+		app.fileManager.processFrontMatter.calls.length = 0;
+
+		const values: Record<string, string> = {
+			'A.md': '🟡 簡報確認',
+			'C.md': '🟢 其他',
+		};
+		const files = Object.keys(values).map((path) => createMockTFile(path));
+		app.vault.getMarkdownFiles = () => files;
+		app.metadataCache.getFileCache = (file: { path: string }) => ({ frontmatter: { status: values[file.path] } });
+		let baseContent = 'cardColorOrder:\n  - 🟡 簡報確認\n  - 🟢 其他\n';
+		app.vault.getFiles = () => [{ extension: 'base', path: 'board.base' }];
+		app.vault.process = (_file: unknown, fn: (content: string) => string) => {
+			baseContent = fn(baseContent);
+			return Promise.resolve(baseContent);
+		};
+		const mmValues: Record<string, string> = { '1': '🟡 簡報確認' };
+		(app as any).plugins = {
+			plugins: {
+				'metadata-menu': {
+					settings: { presetFields: [{ name: 'status', options: { valuesList: mmValues } }] },
+					saveSettings: (): void => undefined,
+				},
+			},
+		};
+
+		const count = await applyRename(app, 'status', '🟡 簡報確認', '簡報定稿');
+
+		assert.strictEqual(count, 1, 'one matching note rewritten');
+		const fm: Record<string, unknown> = { status: '🟡 簡報確認' };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(fm.status, '🟡 簡報定稿', 'rename keeps the existing color emoji');
+		assert.ok(baseContent.includes('🟡 簡報定稿') && !baseContent.includes('簡報確認'), '.base renamed');
+		const cached = getRegisteredColorOptions().get('status') ?? [];
+		assert.ok(cached.includes('🟡 簡報定稿') && !cached.includes('🟡 簡報確認'), 'option cache renamed');
+		assert.strictEqual(mmValues['1'], '🟡 簡報定稿', 'Metadata Menu valuesList renamed');
+		restorePropertySuggester();
+	});
+
+	test('applyDeleteOption removes the .base line, cache entry and Metadata Menu key', async () => {
+		restorePropertySuggester();
+		const view = makeColoredView();
+		controller.config.set('cardColorOrder', ['🟡 簡報確認', '🟢 廢棄']);
+		triggerDataUpdate(view);
+
+		app.vault.getMarkdownFiles = (): unknown[] => [];
+		let baseContent = 'cardColorOrder:\n  - 🟡 簡報確認\n  - 🟢 廢棄\nsomethingElse: true\n';
+		app.vault.getFiles = () => [{ extension: 'base', path: 'board.base' }];
+		app.vault.process = (_file: unknown, fn: (content: string) => string) => {
+			baseContent = fn(baseContent);
+			return Promise.resolve(baseContent);
+		};
+		let mmSaved = false;
+		const mmValues: Record<string, string> = { '1': '🟡 簡報確認', '2': '🟢 廢棄' };
+		(app as any).plugins = {
+			plugins: {
+				'metadata-menu': {
+					settings: { presetFields: [{ name: 'status', options: { valuesList: mmValues } }] },
+					saveSettings: () => {
+						mmSaved = true;
+					},
+				},
+			},
+		};
+
+		await applyDeleteOption(app, 'status', '🟢 廢棄');
+
+		assert.ok(!baseContent.includes('🟢 廢棄'), '.base line removed');
+		assert.ok(baseContent.includes('🟡 簡報確認') && baseContent.includes('somethingElse'), 'other lines intact');
+		const cached = getRegisteredColorOptions().get('status') ?? [];
+		assert.ok(!cached.includes('🟢 廢棄') && cached.includes('🟡 簡報確認'), 'option cache filtered');
+		assert.ok(!('2' in mmValues) && mmValues['1'] === '🟡 簡報確認', 'Metadata Menu key deleted');
+		assert.ok(mmSaved, 'Metadata Menu settings saved');
+		restorePropertySuggester();
+	});
+
+	test('countValueUsage tallies notes by bare value text regardless of emoji', () => {
+		const values: Record<string, string> = {
+			'A.md': '🟡 簡報確認',
+			'B.md': '🩶 簡報確認',
+			'C.md': '🟢 其他',
+		};
+		const files = Object.keys(values).map((path) => createMockTFile(path));
+		app.vault.getMarkdownFiles = () => files;
+		app.metadataCache.getFileCache = (file: { path: string }) => ({ frontmatter: { status: values[file.path] } });
+
+		const counts = countValueUsage(app, 'status');
+		assert.strictEqual(counts.get('簡報確認'), 2, 'different emojis, same bare text, counted together');
+		assert.strictEqual(counts.get('其他'), 1);
+		assert.strictEqual(counts.get('沒人用'), undefined, 'unused value absent from the map');
 	});
 
 	test('with all 8 classic colors taken, new values get brown then gray (no repeats)', () => {

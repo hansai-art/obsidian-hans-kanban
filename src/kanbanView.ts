@@ -234,67 +234,131 @@ export function getRegisteredColorOptions(): Map<string, string[]> {
 }
 
 /**
- * Recolor a status value everywhere: rewrite every markdown note whose
- * card-color property matches it (by bare text), update cardColorOrder
- * entries inside .base files, refresh the option cache, and best-effort sync
- * Metadata Menu's preset-field valuesList. Returns the number of notes
- * rewritten. Powers the "change status color" command.
+ * Rewrite a status value everywhere: every markdown note whose card-color
+ * property matches it (by bare text), cardColorOrder entries inside .base
+ * files, the option cache, and best-effort Metadata Menu's preset-field
+ * valuesList. Returns the number of notes rewritten. Backs both the recolor
+ * and the rename actions of the manage-status command.
  */
-export async function applyRecolor(app: App, propertyName: string, oldValue: string, emoji: string): Promise<number> {
-	const bare = stripLeadingColorEmoji(oldValue.trim());
-	if (!bare) return 0;
-	const newValue = `${emoji} ${bare}`;
-	if (newValue === oldValue) return 0;
+export async function applyValueRewrite(
+	app: App,
+	propertyName: string,
+	oldValue: string,
+	newValue: string,
+): Promise<number> {
+	const oldBare = stripLeadingColorEmoji(oldValue.trim());
+	if (!oldBare || newValue === oldValue) return 0;
 
 	// 1. Rewrite matching notes (bare-text match so any current emoji counts).
 	let count = 0;
 	for (const file of app.vault.getMarkdownFiles()) {
 		const current = frontmatterString(app.metadataCache.getFileCache(file)?.frontmatter?.[propertyName]);
-		if (current === null || stripLeadingColorEmoji(current.trim()) !== bare) continue;
+		if (current === null || stripLeadingColorEmoji(current.trim()) !== oldBare) continue;
 		const guard = `${file.path}::${propertyName}`;
 		autoColorNormalizing.add(guard);
 		try {
 			await app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 				const cur = frontmatterString(frontmatter[propertyName]);
-				if (cur !== null && stripLeadingColorEmoji(cur.trim()) === bare) {
+				if (cur !== null && stripLeadingColorEmoji(cur.trim()) === oldBare) {
 					frontmatter[propertyName] = newValue;
 				}
 			});
 			count++;
 		} catch (error) {
-			console.error('KanbanView: recolor write failed', error);
+			console.error('KanbanView: status rewrite failed', error);
 		} finally {
 			autoColorNormalizing.delete(guard);
 		}
 	}
 
 	// 2. Update cardColorOrder entries in .base configs so the board's fixed
-	// option list follows the new emoji.
-	if (oldValue !== bare) {
-		for (const file of app.vault.getFiles()) {
-			if (file.extension !== 'base') continue;
-			try {
-				await app.vault.process(file, (content: string) =>
-					content.includes(oldValue) ? content.split(oldValue).join(newValue) : content,
-				);
-			} catch (error) {
-				console.error('KanbanView: recolor .base update failed', error);
-			}
-		}
+	// option list follows.
+	if (oldValue !== oldBare) {
+		await rewriteBaseConfigs(app, (content) =>
+			content.includes(oldValue) ? content.split(oldValue).join(newValue) : content,
+		);
 	}
 
 	// 3. Refresh the option cache (and persist it).
 	const options = suggesterOptions.get(propertyName);
 	if (options) {
-		const updated = options.map((value) => (stripLeadingColorEmoji(value.trim()) === bare ? newValue : value));
+		const updated = options.map((value) => (stripLeadingColorEmoji(value.trim()) === oldBare ? newValue : value));
 		suggesterOptions.set(propertyName, updated);
 		persistSuggesterOptions();
 	}
 
 	// 4. Best-effort: keep Metadata Menu's preset Select options in sync.
-	syncMetadataMenuOption(app, propertyName, bare, newValue);
+	syncMetadataMenuOption(app, propertyName, oldBare, newValue);
 
 	return count;
+}
+
+/** Recolor: same bare text, new leading emoji. */
+export async function applyRecolor(app: App, propertyName: string, oldValue: string, emoji: string): Promise<number> {
+	const bare = stripLeadingColorEmoji(oldValue.trim());
+	if (!bare) return 0;
+	return applyValueRewrite(app, propertyName, oldValue, `${emoji} ${bare}`);
+}
+
+/** Rename: new bare text, keeping the current leading emoji if there is one. */
+export async function applyRename(app: App, propertyName: string, oldValue: string, newBare: string): Promise<number> {
+	const trimmed = newBare.trim();
+	if (!trimmed) return 0;
+	const lead = [...oldValue.trim()][0] ?? '';
+	const newValue = EMOJI_COLOR_MAP[lead] ? `${lead} ${trimmed}` : trimmed;
+	return applyValueRewrite(app, propertyName, oldValue, newValue);
+}
+
+/**
+ * Delete an UNUSED option: drop its cardColorOrder line from .base files,
+ * remove it from Metadata Menu's valuesList and from the option cache. The
+ * caller is responsible for checking the usage count first.
+ */
+export async function applyDeleteOption(app: App, propertyName: string, value: string): Promise<void> {
+	const escaped = value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const linePattern = new RegExp(`^\\s*-\\s*["']?${escaped}["']?\\s*$`);
+	await rewriteBaseConfigs(app, (content) =>
+		content
+			.split('\n')
+			.filter((line) => !linePattern.test(line))
+			.join('\n'),
+	);
+
+	const options = suggesterOptions.get(propertyName);
+	if (options) {
+		suggesterOptions.set(
+			propertyName,
+			options.filter((option) => option !== value),
+		);
+		persistSuggesterOptions();
+	}
+
+	removeMetadataMenuOption(app, propertyName, stripLeadingColorEmoji(value.trim()));
+}
+
+/** Map of bare value text → number of markdown notes currently using it. */
+export function countValueUsage(app: App, propertyName: string): Map<string, number> {
+	const counts = new Map<string, number>();
+	for (const file of app.vault.getMarkdownFiles()) {
+		const current = frontmatterString(app.metadataCache.getFileCache(file)?.frontmatter?.[propertyName]);
+		if (current === null) continue;
+		const bare = stripLeadingColorEmoji(current.trim());
+		if (!bare) continue;
+		counts.set(bare, (counts.get(bare) ?? 0) + 1);
+	}
+	return counts;
+}
+
+/** Run a content transform over every .base file in the vault. */
+async function rewriteBaseConfigs(app: App, transform: (content: string) => string): Promise<void> {
+	for (const file of app.vault.getFiles()) {
+		if (file.extension !== 'base') continue;
+		try {
+			await app.vault.process(file, transform);
+		} catch (error) {
+			console.error('KanbanView: .base update failed', error);
+		}
+	}
 }
 
 /** Replace bare-matching entries inside one valuesList record. */
@@ -308,8 +372,27 @@ function replaceValuesListMatches(valuesList: Record<string, unknown>, bare: str
 	return touched;
 }
 
-/** Replace a matching value inside Metadata Menu's preset-field valuesList. */
-function syncMetadataMenuOption(app: App, propertyName: string, bare: string, newValue: string): void {
+/** Delete bare-matching entries from one valuesList record. */
+function deleteValuesListMatches(valuesList: Record<string, unknown>, bare: string): boolean {
+	let touched = false;
+	for (const [key, value] of Object.entries(valuesList)) {
+		if (typeof value !== 'string' || stripLeadingColorEmoji(value.trim()) !== bare) continue;
+		delete valuesList[key];
+		touched = true;
+	}
+	return touched;
+}
+
+/**
+ * Apply a mutation to Metadata Menu's preset-field valuesList(s) for one
+ * property, then persist via its own saveSettings. Best-effort: silently a
+ * no-op when the plugin, the field or the valuesList is absent.
+ */
+function mutateMetadataMenuOptions(
+	app: App,
+	propertyName: string,
+	mutate: (valuesList: Record<string, unknown>) => boolean,
+): void {
 	try {
 		const plugins: unknown = Reflect.get(app, 'plugins');
 		if (typeof plugins !== 'object' || plugins === null) return;
@@ -326,7 +409,7 @@ function syncMetadataMenuOption(app: App, propertyName: string, bare: string, ne
 			if (!isRecord(field) || field.name !== propertyName) continue;
 			const options = field.options;
 			if (!isRecord(options) || !isRecord(options.valuesList)) continue;
-			if (replaceValuesListMatches(options.valuesList, bare, newValue)) touched = true;
+			if (mutate(options.valuesList)) touched = true;
 		}
 		if (!touched) return;
 		const save: unknown = Reflect.get(mm, 'saveSettings');
@@ -334,6 +417,16 @@ function syncMetadataMenuOption(app: App, propertyName: string, bare: string, ne
 	} catch (error) {
 		console.error('KanbanView: Metadata Menu sync failed', error);
 	}
+}
+
+/** Replace a matching value inside Metadata Menu's preset-field valuesList. */
+function syncMetadataMenuOption(app: App, propertyName: string, bare: string, newValue: string): void {
+	mutateMetadataMenuOptions(app, propertyName, (valuesList) => replaceValuesListMatches(valuesList, bare, newValue));
+}
+
+/** Remove a matching value from Metadata Menu's preset-field valuesList. */
+function removeMetadataMenuOption(app: App, propertyName: string, bare: string): void {
+	mutateMetadataMenuOptions(app, propertyName, (valuesList) => deleteValuesListMatches(valuesList, bare));
 }
 
 /**
