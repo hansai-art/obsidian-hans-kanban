@@ -12,7 +12,7 @@ import {
 	SORTED_CARD_ORDER_NOTICE,
 	UNCATEGORIZED_LABEL,
 } from '../src/constants.ts';
-import { isCardOrders, KanbanView, restorePropertySuggester } from '../src/kanbanView.ts';
+import { isCardOrders, KanbanView, registerGlobalAutoColor, restorePropertySuggester } from '../src/kanbanView.ts';
 import { normalizePropertyValue } from '../src/utils/grouping.ts';
 import {
 	createEmptyEntries,
@@ -4266,33 +4266,45 @@ describe('Card Color - auto-color and custom override', () => {
 		assert.ok(KNOWN_EMOJIS.includes([...written][0]), `none should still leave an auto color, got "${written}"`);
 	});
 
-	test('_autoColorEmoji rewrites an emoji-less value for a card on this board', async () => {
+	test('global auto-color rewrites an emoji-less value, even with no board view alive', async () => {
+		// A board render fills the option cache, then the view closes (tab went
+		// background) — the plugin-level listener must still color edits.
 		const view = makeRenderedView();
-		// Let the render-time sweep's .finally() clear its re-entrancy guard first.
 		await new Promise((resolve) => setTimeout(resolve, 0));
+		view.onClose();
 		app.fileManager.processFrontMatter.calls.length = 0;
 
-		await (view as any)._autoColorEmoji({ path: 'Task 1.md' } as any, { frontmatter: { status: 'To Do' } });
+		const ref: any = registerGlobalAutoColor(app);
+		await ref.callback({ path: 'Anywhere.md' }, null, { frontmatter: { status: 'To Do' } });
+		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 1, 'one rewrite for the in-board file');
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 1, 'one rewrite for the edited file');
 		const fm: Record<string, unknown> = { status: 'To Do' };
 		await app.fileManager.processFrontMatter.calls[0][1](fm);
 		const written = fm.status as string;
 		assert.ok(written.endsWith(' To Do') && KNOWN_EMOJIS.includes([...written][0]), `got "${written}"`);
 	});
 
-	test('_autoColorEmoji ignores files that are not part of this board', async () => {
-		const view = makeRenderedView();
+	test('global auto-color ignores properties no board has registered', async () => {
+		makeRenderedView();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		app.fileManager.processFrontMatter.calls.length = 0;
 
-		await (view as any)._autoColorEmoji({ path: 'Somewhere Else.md' } as any, { frontmatter: { status: '緊急' } });
+		const ref: any = registerGlobalAutoColor(app);
+		await ref.callback({ path: 'Note.md' }, null, { frontmatter: { unrelated: '緊急' } });
+		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'out-of-board files are untouched');
+		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'unregistered properties are untouched');
 	});
 
-	test('_autoColorEmoji leaves an already-colored value untouched', async () => {
-		const view = makeRenderedView();
+	test('global auto-color leaves an already-colored value untouched', async () => {
+		makeRenderedView();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		app.fileManager.processFrontMatter.calls.length = 0;
 
-		await (view as any)._autoColorEmoji({ path: 'Task 1.md' } as any, { frontmatter: { status: '🔴 To Do' } });
+		const ref: any = registerGlobalAutoColor(app);
+		await ref.callback({ path: 'Task 1.md' }, null, { frontmatter: { status: '🔴 To Do' } });
+		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'value with a color emoji is not rewritten');
 	});

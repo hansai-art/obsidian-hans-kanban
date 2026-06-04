@@ -8,6 +8,7 @@ import {
 	isRecord,
 	isColumnOrders,
 	isColumnColors,
+	registerGlobalAutoColor,
 	restorePropertySuggester,
 } from './kanbanView.ts';
 
@@ -68,6 +69,12 @@ export default class KanbanBasesViewPlugin extends Plugin {
 			},
 			options: KanbanView.getViewOptions,
 		});
+
+		// Auto-color edited card-color values plugin-wide. This must outlive any
+		// single board view: Bases tears a view down whenever its tab goes to the
+		// background, which is exactly when the user edits a note's property.
+		const autoColorRef = registerGlobalAutoColor(this.app);
+		if (autoColorRef) this.registerEvent(autoColorRef);
 
 		// One-click sample board, always available from the command palette.
 		this.addCommand({

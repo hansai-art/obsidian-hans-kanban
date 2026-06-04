@@ -1,4 +1,5 @@
 import type {
+	App,
 	BasesEntry,
 	BasesPropertyId,
 	BasesViewConfig,
@@ -112,6 +113,74 @@ export function restorePropertySuggester(): void {
 	}
 }
 
+/**
+ * Plugin-level auto-color: whenever any note's frontmatter changes and one of
+ * its properties is a known card-color property (per suggesterOptions, fed by
+ * board renders), prepend a color emoji to a raw value. This lives on the
+ * PLUGIN lifecycle, not the view's — Bases tears the board view down whenever
+ * its tab goes background, which is exactly when the user edits a note's
+ * property, so a view-scoped listener would be dead at that moment.
+ * Returns the EventRef for Plugin.registerEvent, or null without the API.
+ */
+export function registerGlobalAutoColor(app: App): EventRef | null {
+	const cache = app.metadataCache;
+	if (!cache || typeof cache.on !== 'function') return null;
+	return cache.on('changed', (file, _data, fileCache) => {
+		void autoColorFileProperties(app, file, fileCache);
+	});
+}
+
+const autoColorNormalizing = new Set<string>();
+
+async function autoColorFileProperties(app: App, file: TFile, fileCache: CachedMetadata | null): Promise<void> {
+	const frontmatter = fileCache?.frontmatter;
+	if (!frontmatter || !app.fileManager) return;
+	for (const [propertyName, options] of suggesterOptions) {
+		const raw = frontmatterString(frontmatter[propertyName]);
+		if (raw === null) continue;
+		const value = raw.trim();
+		if (!value) continue;
+		const leadEmoji = [...value][0] ?? '';
+		if (EMOJI_COLOR_MAP[leadEmoji]) continue; // already colored
+		const guard = `${file.path}::${propertyName}`;
+		if (autoColorNormalizing.has(guard)) continue;
+		const emoji = leastUsedEmojiAmong(options);
+		if (!emoji) continue;
+		autoColorNormalizing.add(guard);
+		try {
+			await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+				const current = frontmatterString(fm[propertyName]);
+				if (current !== null && current.trim() === value) {
+					fm[propertyName] = `${emoji} ${value}`;
+				}
+			});
+		} catch (error) {
+			console.error('KanbanView: global auto color-emoji failed', error);
+		} finally {
+			autoColorNormalizing.delete(guard);
+		}
+	}
+}
+
+/** Dot emoji of the palette color least used by the given option values. */
+function leastUsedEmojiAmong(options: string[]): string | null {
+	const counts = new Map<string, number>();
+	for (const option of options) {
+		const colorName = EMOJI_COLOR_MAP[[...option][0] ?? ''];
+		if (colorName) counts.set(colorName, (counts.get(colorName) ?? 0) + 1);
+	}
+	let best: string | null = null;
+	let bestCount = Number.POSITIVE_INFINITY;
+	for (const color of COLOR_PALETTE) {
+		const count = counts.get(color.name) ?? 0;
+		if (count < bestCount) {
+			best = color.name;
+			bestCount = count;
+		}
+	}
+	return best ? (COLOR_NAME_TO_EMOJI[best] ?? null) : null;
+}
+
 function isStringArrayRecord(value: unknown): value is Record<string, string[]> {
 	return isRecord(value) && !Array.isArray(value) && Object.values(value).every(isStringArray);
 }
@@ -175,13 +244,7 @@ export class KanbanView extends BasesView {
 	 */
 	private _cardColorPrefs: Record<string, string> = {};
 	private _cardColorPrefsKey: BasesPropertyId | null = null;
-	/**
-	 * metadataCache "changed" subscription that auto-prepends a color emoji to
-	 * any card-color value typed without one (the native property editor, manual
-	 * frontmatter edits, anywhere). Re-entrancy guard prevents the listener from
-	 * reacting to its own writes. Both cleaned up in onClose.
-	 */
-	private _metadataChangeRef: EventRef | null = null;
+	/** Re-entrancy guard so the render-time color sweep skips in-flight writes. */
 	private _normalizingColorPaths: Set<string> = new Set();
 	/** Set at the top of onClose; guards late renders/sweeps on a dead view. */
 	private _closed = false;
@@ -296,14 +359,10 @@ export class KanbanView extends BasesView {
 			this.triggerHoverPreview(href, sourcePath, evt, linkEl);
 		});
 
-		// Auto-color: whenever a note's card-color value is edited (native property
-		// editor, manual frontmatter edit, sync) and lacks a leading color emoji,
-		// prepend the resolved palette emoji so every value always carries a color.
-		if (this.app?.metadataCache && typeof this.app.metadataCache.on === 'function') {
-			this._metadataChangeRef = this.app.metadataCache.on('changed', (file, _data, cache) => {
-				void this._autoColorEmoji(file, cache);
-			});
-		}
+		// NOTE: live auto-coloring of edited values is handled by the PLUGIN-level
+		// listener (registerGlobalAutoColor in main.ts), not per-view — Bases tears
+		// this view down whenever its tab goes background, which is exactly when
+		// the user is editing a note's property in another tab.
 
 		this._debouncedRender = debounce(() => {
 			if (this._closed) return;
@@ -429,11 +488,13 @@ export class KanbanView extends BasesView {
 	private _patchPropertySuggester(): void {
 		const propertyName = this._suggesterPropertyName();
 		if (!propertyName) return;
+		// Always refresh the option cache: the global auto-color listener and the
+		// suggester wrapper both read it, even when the patch can't install.
+		suggesterOptions.set(propertyName, [...this._cardColorValues]);
 		const cache = this.app?.metadataCache;
 		if (!cache) return;
 		const current: unknown = Reflect.get(cache, SUGGESTER_FN_KEY);
 		if (!isPropertyValuesFn(current)) return;
-		suggesterOptions.set(propertyName, [...this._cardColorValues]);
 		if (suggesterPatch) return;
 		const original = current;
 		const wrapper = (key: string): unknown => {
@@ -1567,16 +1628,10 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * metadataCache "changed" handler. When a note that belongs to this board has
-	 * a card-color value lacking a leading color emoji, rewrite its frontmatter to
-	 * prepend the resolved palette emoji. Scoped to the current entries and guarded
-	 * against reacting to its own write (the rewritten value carries an emoji, so a
-	 * second pass returns early anyway, but the guard avoids a redundant write).
-	 */
-	/**
 	 * Catch-up sweep run on every render: prepend a color emoji to any in-board
-	 * card-color value that lacks one. Complements _autoColorEmoji, which only
-	 * reacts to live metadata changes while this view instance is open.
+	 * card-color value that lacks one. Complements the plugin-level auto-color
+	 * listener (registerGlobalAutoColor), which only knows the option list after
+	 * the first board render of the session.
 	 */
 	private _sweepColorEmoji(entries: BasesEntry[]): void {
 		if (this._closed || !this.cardColorPropertyId || !this.app?.fileManager) return;
@@ -1604,36 +1659,6 @@ export class KanbanView extends BasesView {
 				})
 				.catch((error: unknown) => console.error('KanbanView: color-emoji sweep failed', error))
 				.finally(() => this._normalizingColorPaths.delete(path));
-		}
-	}
-
-	private async _autoColorEmoji(file: TFile, cache: CachedMetadata | null): Promise<void> {
-		if (this._closed || !this.cardColorPropertyId || !this.app?.fileManager) return;
-		if (!this._entryMap.has(file.path)) return;
-		if (this._normalizingColorPaths.has(file.path)) return;
-		const parsed = parsePropertyId(this.cardColorPropertyId);
-		if (parsed.type !== 'note' || !parsed.name) return;
-		const propertyName = parsed.name;
-		const raw = frontmatterString(cache?.frontmatter?.[propertyName]);
-		if (raw === null) return;
-		const value = raw.trim();
-		if (!value) return;
-		const leadEmoji = [...value][0] ?? '';
-		if (EMOJI_COLOR_MAP[leadEmoji]) return; // already colored
-		const colored = this._withColorEmoji(value);
-		if (colored === value) return;
-		this._normalizingColorPaths.add(file.path);
-		try {
-			await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
-				const current = frontmatterString(frontmatter[propertyName]);
-				if (current !== null && current.trim() === value) {
-					frontmatter[propertyName] = colored;
-				}
-			});
-		} catch (error) {
-			console.error('KanbanView: auto color-emoji failed', error);
-		} finally {
-			this._normalizingColorPaths.delete(file.path);
 		}
 	}
 
@@ -2094,13 +2119,9 @@ export class KanbanView extends BasesView {
 	onClose(): void {
 		// Tear down event paths FIRST: the flush below writes config, which can make
 		// the Bases host emit onDataUpdated / metadata events while we are closing.
-		// Mark closed (guards any already-queued debounced render), detach the
-		// metadata listener, then cancel the debounce.
+		// Mark closed (guards any already-queued debounced render), then cancel the
+		// debounce.
 		this._closed = true;
-		if (this._metadataChangeRef && this.app?.metadataCache?.offref) {
-			this.app.metadataCache.offref(this._metadataChangeRef);
-			this._metadataChangeRef = null;
-		}
 		this._debouncedRender.cancel();
 		// NOTE: the property-suggester patch is deliberately NOT removed here —
 		// Bases closes the view whenever its tab goes background, which is when
