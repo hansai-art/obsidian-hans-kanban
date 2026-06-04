@@ -4062,6 +4062,23 @@ describe('Card Color - auto-color and custom override', () => {
 		);
 	});
 
+	test('with all 8 classic colors taken, new values get brown then gray (no repeats)', () => {
+		const taken = ['🔴 a', '🟠 b', '🟡 c', '🟢 d', '🔵 e', '🟣 f', '🩵 g', '🩷 h'];
+		const controller2: any = createMockQueryController(
+			taken.map((v, i) => createMockBasesEntry(createMockTFile(`T${i}.md`), { [PROPERTY_STATUS]: v })),
+			TEST_PROPERTIES,
+		);
+		controller2.app = app;
+		controller2.config.getAsPropertyId = (key: string) =>
+			key === 'groupByProperty' || key === 'cardColorProperty' ? PROPERTY_STATUS : null;
+		const view = new KanbanView(controller2, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		assert.strictEqual((view as any)._withColorEmoji('第九個'), '🟤 第九個', '9th value takes brown');
+		assert.strictEqual((view as any)._withColorEmoji('第十個'), '🩶 第十個', '10th value takes gray');
+	});
+
 	test('a burst of brand-new values spreads across the palette', () => {
 		const view = makeRenderedView();
 		const first = (view as any)._withColorEmoji('全新值一');

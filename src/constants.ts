@@ -20,6 +20,11 @@ export const COLOR_PALETTE = [
 	{ name: 'blue', cssVar: 'var(--color-blue)' },
 	{ name: 'purple', cssVar: 'var(--color-purple)' },
 	{ name: 'pink', cssVar: 'var(--color-pink)' },
+	// Obsidian themes don't define brown/gray accent variables, so these two
+	// carry fallbacks. They extend the palette to 10 so boards with all 8
+	// classic colors taken can still hand new values an unused color.
+	{ name: 'brown', cssVar: 'var(--color-brown, #9a6b4a)' },
+	{ name: 'gray', cssVar: 'var(--color-gray, #8a8a8a)' },
 ] as const;
 
 export type ColorName = (typeof COLOR_PALETTE)[number]['name'];
@@ -38,6 +43,8 @@ export const EMOJI_COLOR_MAP: Record<string, ColorName> = {
 	'🟣': 'purple',
 	'🩵': 'cyan',
 	'🩷': 'pink',
+	'🟤': 'brown',
+	'🩶': 'gray',
 };
 
 /** Inverse of EMOJI_COLOR_MAP: palette color name → leading dot emoji. */
@@ -50,6 +57,8 @@ export const COLOR_NAME_TO_EMOJI: Record<string, string> = {
 	purple: '🟣',
 	cyan: '🩵',
 	pink: '🩷',
+	brown: '🟤',
+	gray: '🩶',
 };
 
 /** Sortable.js group name for kanban columns */
