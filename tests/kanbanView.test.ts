@@ -13,6 +13,8 @@ import {
 	UNCATEGORIZED_LABEL,
 } from '../src/constants.ts';
 import {
+	applyRecolor,
+	getRegisteredColorOptions,
 	isCardOrders,
 	KanbanView,
 	installWriteTimeAutoColor,
@@ -4176,6 +4178,56 @@ describe('Card Color - auto-color and custom override', () => {
 		// A board render updates the cache and fires the persistence callback.
 		makeRenderedView();
 		assert.ok(saved !== null && 'status' in (saved as object), 'render persists the refreshed option map');
+		restorePropertySuggester();
+	});
+
+	test('applyRecolor rewrites matching notes, .base configs, cache and Metadata Menu', async () => {
+		restorePropertySuggester();
+		const view = makeColoredView();
+		controller.config.set('cardColorOrder', ['🟡 簡報確認', '🟢 其他']);
+		triggerDataUpdate(view);
+		app.fileManager.processFrontMatter.calls.length = 0;
+
+		// Vault: two notes match (different emojis, same bare text), one doesn't.
+		const values: Record<string, string> = {
+			'A.md': '🟡 簡報確認',
+			'B.md': '🩶 簡報確認',
+			'C.md': '🟢 其他',
+		};
+		const files = Object.keys(values).map((path) => createMockTFile(path));
+		app.vault.getMarkdownFiles = () => files;
+		app.metadataCache.getFileCache = (file: { path: string }) => ({ frontmatter: { status: values[file.path] } });
+		let baseContent = 'cardColorOrder:\n  - 🟡 簡報確認\n  - 🟢 其他\n';
+		app.vault.getFiles = () => [{ extension: 'base', path: 'board.base' }];
+		app.vault.process = (_file: unknown, fn: (content: string) => string) => {
+			baseContent = fn(baseContent);
+			return Promise.resolve(baseContent);
+		};
+		let mmSaved = false;
+		const mmValues: Record<string, string> = { '1': '🟡 簡報確認', '2': '🟢 其他' };
+		(app as any).plugins = {
+			plugins: {
+				'metadata-menu': {
+					settings: { presetFields: [{ name: 'status', options: { valuesList: mmValues } }] },
+					saveSettings: () => {
+						mmSaved = true;
+					},
+				},
+			},
+		};
+
+		const count = await applyRecolor(app, 'status', '🟡 簡報確認', '💚');
+
+		assert.strictEqual(count, 2, 'both bare-matching notes rewritten (A and B), C untouched');
+		const fm: Record<string, unknown> = { status: '🟡 簡報確認' };
+		await app.fileManager.processFrontMatter.calls[0][1](fm);
+		assert.strictEqual(fm.status, '💚 簡報確認', 'note value carries the chosen emoji');
+		assert.ok(baseContent.includes('💚 簡報確認') && !baseContent.includes('🟡 簡報確認'), '.base updated');
+		const cached = getRegisteredColorOptions().get('status') ?? [];
+		assert.ok(cached.includes('💚 簡報確認') && !cached.includes('🟡 簡報確認'), 'option cache updated');
+		assert.strictEqual(mmValues['1'], '💚 簡報確認', 'Metadata Menu valuesList updated');
+		assert.strictEqual(mmValues['2'], '🟢 其他', 'unrelated Metadata Menu option untouched');
+		assert.ok(mmSaved, 'Metadata Menu settings saved');
 		restorePropertySuggester();
 	});
 

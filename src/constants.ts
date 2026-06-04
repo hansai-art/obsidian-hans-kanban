@@ -45,7 +45,55 @@ export const EMOJI_COLOR_MAP: Record<string, ColorName> = {
 	'🩷': 'pink',
 	'🟤': 'brown',
 	'🩶': 'gray',
+	// Alternates selectable via the recolor picker. All single-codepoint (no
+	// VS16 sequences like ❤️), so the leading-emoji strip logic stays safe.
+	'🌹': 'red',
+	'🧡': 'orange',
+	'🔥': 'orange',
+	'💛': 'yellow',
+	'⭐': 'yellow',
+	'💚': 'green',
+	'✅': 'green',
+	'💙': 'blue',
+	'💎': 'cyan',
+	'💜': 'purple',
+	'🌸': 'pink',
+	'🤎': 'brown',
+	'🖤': 'gray',
+	'🤍': 'gray',
 };
+
+/**
+ * Picker grid for the recolor command: every choice the user can assign to a
+ * status value, grouped by palette color. The first emoji of each color is
+ * the canonical dot used for automatic assignment (COLOR_NAME_TO_EMOJI).
+ */
+export const EMOJI_CHOICES: ReadonlyArray<{ emoji: string; color: ColorName }> = [
+	{ emoji: '🔴', color: 'red' },
+	{ emoji: '🌹', color: 'red' },
+	{ emoji: '🟠', color: 'orange' },
+	{ emoji: '🧡', color: 'orange' },
+	{ emoji: '🔥', color: 'orange' },
+	{ emoji: '🟡', color: 'yellow' },
+	{ emoji: '💛', color: 'yellow' },
+	{ emoji: '⭐', color: 'yellow' },
+	{ emoji: '🟢', color: 'green' },
+	{ emoji: '💚', color: 'green' },
+	{ emoji: '✅', color: 'green' },
+	{ emoji: '🩵', color: 'cyan' },
+	{ emoji: '💎', color: 'cyan' },
+	{ emoji: '🔵', color: 'blue' },
+	{ emoji: '💙', color: 'blue' },
+	{ emoji: '🟣', color: 'purple' },
+	{ emoji: '💜', color: 'purple' },
+	{ emoji: '🩷', color: 'pink' },
+	{ emoji: '🌸', color: 'pink' },
+	{ emoji: '🟤', color: 'brown' },
+	{ emoji: '🤎', color: 'brown' },
+	{ emoji: '🩶', color: 'gray' },
+	{ emoji: '🖤', color: 'gray' },
+	{ emoji: '🤍', color: 'gray' },
+];
 
 /** Inverse of EMOJI_COLOR_MAP: palette color name → leading dot emoji. */
 export const COLOR_NAME_TO_EMOJI: Record<string, string> = {

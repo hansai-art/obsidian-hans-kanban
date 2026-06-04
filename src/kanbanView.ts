@@ -221,6 +221,115 @@ export function restoreWriteTimeAutoColor(): void {
 	}
 }
 
+/** Strip a single leading color emoji (and its trailing space) from a value. */
+export function stripLeadingColorEmoji(value: string): string {
+	const leadEmoji = [...value][0] ?? '';
+	if (!EMOJI_COLOR_MAP[leadEmoji]) return value;
+	return value.slice(leadEmoji.length).replace(/^\s+/, '');
+}
+
+/** Snapshot of the registered card-color options, for the recolor picker. */
+export function getRegisteredColorOptions(): Map<string, string[]> {
+	return new Map([...suggesterOptions].map(([key, values]) => [key, [...values]]));
+}
+
+/**
+ * Recolor a status value everywhere: rewrite every markdown note whose
+ * card-color property matches it (by bare text), update cardColorOrder
+ * entries inside .base files, refresh the option cache, and best-effort sync
+ * Metadata Menu's preset-field valuesList. Returns the number of notes
+ * rewritten. Powers the "change status color" command.
+ */
+export async function applyRecolor(app: App, propertyName: string, oldValue: string, emoji: string): Promise<number> {
+	const bare = stripLeadingColorEmoji(oldValue.trim());
+	if (!bare) return 0;
+	const newValue = `${emoji} ${bare}`;
+	if (newValue === oldValue) return 0;
+
+	// 1. Rewrite matching notes (bare-text match so any current emoji counts).
+	let count = 0;
+	for (const file of app.vault.getMarkdownFiles()) {
+		const current = frontmatterString(app.metadataCache.getFileCache(file)?.frontmatter?.[propertyName]);
+		if (current === null || stripLeadingColorEmoji(current.trim()) !== bare) continue;
+		const guard = `${file.path}::${propertyName}`;
+		autoColorNormalizing.add(guard);
+		try {
+			await app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
+				const cur = frontmatterString(frontmatter[propertyName]);
+				if (cur !== null && stripLeadingColorEmoji(cur.trim()) === bare) {
+					frontmatter[propertyName] = newValue;
+				}
+			});
+			count++;
+		} catch (error) {
+			console.error('KanbanView: recolor write failed', error);
+		} finally {
+			autoColorNormalizing.delete(guard);
+		}
+	}
+
+	// 2. Update cardColorOrder entries in .base configs so the board's fixed
+	// option list follows the new emoji.
+	if (oldValue !== bare) {
+		for (const file of app.vault.getFiles()) {
+			if (file.extension !== 'base') continue;
+			try {
+				await app.vault.process(file, (content: string) =>
+					content.includes(oldValue) ? content.split(oldValue).join(newValue) : content,
+				);
+			} catch (error) {
+				console.error('KanbanView: recolor .base update failed', error);
+			}
+		}
+	}
+
+	// 3. Refresh the option cache (and persist it).
+	const options = suggesterOptions.get(propertyName);
+	if (options) {
+		const updated = options.map((value) => (stripLeadingColorEmoji(value.trim()) === bare ? newValue : value));
+		suggesterOptions.set(propertyName, updated);
+		persistSuggesterOptions();
+	}
+
+	// 4. Best-effort: keep Metadata Menu's preset Select options in sync.
+	syncMetadataMenuOption(app, propertyName, bare, newValue);
+
+	return count;
+}
+
+/** Replace a matching value inside Metadata Menu's preset-field valuesList. */
+function syncMetadataMenuOption(app: App, propertyName: string, bare: string, newValue: string): void {
+	try {
+		const plugins: unknown = Reflect.get(app, 'plugins');
+		if (typeof plugins !== 'object' || plugins === null) return;
+		const registry: unknown = Reflect.get(plugins, 'plugins');
+		if (typeof registry !== 'object' || registry === null) return;
+		const mm: unknown = Reflect.get(registry, 'metadata-menu');
+		if (typeof mm !== 'object' || mm === null) return;
+		const settings: unknown = Reflect.get(mm, 'settings');
+		if (typeof settings !== 'object' || settings === null) return;
+		const presetFields: unknown = Reflect.get(settings, 'presetFields');
+		if (!Array.isArray(presetFields)) return;
+		let touched = false;
+		for (const field of presetFields) {
+			if (!isRecord(field) || field.name !== propertyName) continue;
+			const options = field.options;
+			if (!isRecord(options) || !isRecord(options.valuesList)) continue;
+			const valuesList = options.valuesList;
+			for (const [key, value] of Object.entries(valuesList)) {
+				if (typeof value !== 'string' || stripLeadingColorEmoji(value.trim()) !== bare) continue;
+				valuesList[key] = newValue;
+				touched = true;
+			}
+		}
+		if (!touched) return;
+		const save: unknown = Reflect.get(mm, 'saveSettings');
+		if (typeof save === 'function') void save.call(mm);
+	} catch (error) {
+		console.error('KanbanView: Metadata Menu sync failed', error);
+	}
+}
+
 /**
  * Plugin-level auto-color: whenever any note's frontmatter changes and one of
  * its properties is a known card-color property (per suggesterOptions, fed by
@@ -1723,9 +1832,7 @@ export class KanbanView extends BasesView {
 
 	/** Strip a single leading color emoji (and its trailing space) from a value. */
 	private _stripLeadingColorEmoji(value: string): string {
-		const leadEmoji = [...value][0] ?? '';
-		if (!EMOJI_COLOR_MAP[leadEmoji]) return value;
-		return value.slice(leadEmoji.length).replace(/^\s+/, '');
+		return stripLeadingColorEmoji(value);
 	}
 
 	/**

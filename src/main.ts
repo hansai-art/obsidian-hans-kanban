@@ -15,6 +15,7 @@ import {
 	restoreWriteTimeAutoColor,
 	setSuggesterOptionsPersistence,
 } from './kanbanView.ts';
+import { openRecolorModal } from './recolorModal.ts';
 
 export const KANBAN_VIEW_TYPE = 'hans-kanban-view';
 
@@ -97,6 +98,15 @@ export default class KanbanBasesViewPlugin extends Plugin {
 			name: t('command.createDemo'),
 			callback: () => {
 				void createDemoBoard(this.app);
+			},
+		});
+
+		// Recolor any status value (picker UI) without opening a board.
+		this.addCommand({
+			id: 'recolor-status',
+			name: t('command.recolor'),
+			callback: () => {
+				openRecolorModal(this.app);
 			},
 		});
 

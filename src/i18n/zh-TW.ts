@@ -43,6 +43,11 @@ export const zhTW: Record<StringKey, string> = {
 	'quickAdd.folderNotFound': '找不到快速新增資料夾：',
 
 	'command.createDemo': '建立範例看板',
+	'command.recolor': '更改狀態顏色 / 圖示',
+	'recolor.pickValue': '選擇要改的狀態',
+	'recolor.pickEmoji': '選擇新的顏色 / 圖示：',
+	'recolor.empty': '還沒有狀態選項，請先開啟一次看板。',
+	'recolor.done': '張卡片已更新為',
 	'demo.promptTitle': '👋 歡迎使用 Hans Kanban',
 	'demo.promptBody':
 		'要不要先建立一個範例看板？裡面有可以拖曳、可以切換狀態的彩色卡片，讓你立刻看到效果。不會動到你 vault 裡的其他東西。',
