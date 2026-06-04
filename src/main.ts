@@ -2,7 +2,14 @@ import { Plugin } from 'obsidian';
 import { HOVER_LINK_SOURCE_ID } from './constants.ts';
 import { createDemoBoard, DemoPromptModal } from './demo.ts';
 import { t } from './i18n/index.ts';
-import { KanbanView, type LegacyData, isRecord, isColumnOrders, isColumnColors } from './kanbanView.ts';
+import {
+	KanbanView,
+	type LegacyData,
+	isRecord,
+	isColumnOrders,
+	isColumnColors,
+	restorePropertySuggester,
+} from './kanbanView.ts';
 
 export const KANBAN_VIEW_TYPE = 'hans-kanban-view';
 
@@ -86,6 +93,9 @@ export default class KanbanBasesViewPlugin extends Plugin {
 	}
 
 	onunload() {
-		// Cleanup if needed
+		// Hand Obsidian's property-value suggester back to its original
+		// implementation (boards keep it patched across view close, see
+		// kanbanView.ts).
+		restorePropertySuggester();
 	}
 }

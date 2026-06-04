@@ -12,7 +12,7 @@ import {
 	SORTED_CARD_ORDER_NOTICE,
 	UNCATEGORIZED_LABEL,
 } from '../src/constants.ts';
-import { isCardOrders, KanbanView } from '../src/kanbanView.ts';
+import { isCardOrders, KanbanView, restorePropertySuggester } from '../src/kanbanView.ts';
 import { normalizePropertyValue } from '../src/utils/grouping.ts';
 import {
 	createEmptyEntries,
@@ -4082,10 +4082,21 @@ describe('Card Color - auto-color and custom override', () => {
 		assert.strictEqual(new Set(merged).size, merged.length, 'no duplicates');
 		assert.deepStrictEqual(patched('other'), vaultValues, 'unrelated properties stay untouched');
 
-		// Closing the last board restores the original function.
+		// Closing the board must NOT drop the options: Bases closes the view
+		// whenever its tab goes background, which is exactly when the user is
+		// editing a note's property in another tab.
 		view.onClose();
+		const afterClose = (app.metadataCache as any).getFrontmatterPropertyValuesForKey;
+		assert.deepStrictEqual(
+			afterClose('status').slice(0, 3),
+			['🔴 講義', '🟠 簡報', '🟡 簡報確認'],
+			'options survive view close',
+		);
+
+		// Plugin unload hands the original function back.
+		restorePropertySuggester();
 		const restored = (app.metadataCache as any).getFrontmatterPropertyValuesForKey;
-		assert.deepStrictEqual(restored('status'), vaultValues, 'original suggester restored after close');
+		assert.deepStrictEqual(restored('status'), vaultValues, 'original suggester restored on plugin unload');
 	});
 
 	test('with all 8 classic colors taken, new values get brown then gray (no repeats)', () => {

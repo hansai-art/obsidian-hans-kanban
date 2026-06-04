@@ -87,16 +87,30 @@ function isStringArray(value: unknown): value is string[] {
  * Obsidian's native property-value suggester is fed by the (internal)
  * `metadataCache.getFrontmatterPropertyValuesForKey`, which only returns
  * values currently in use across the vault — so configured-but-unused
- * card-color options never show up there. Open kanban views register here as
- * providers and a wrapper merges their full option list (configured order
- * first, then in-use extras) into the suggester for their color property.
- * The original function is restored when the last provider closes.
+ * card-color options never show up there. Each board render stores its full
+ * option list here (keyed by frontmatter property name) and a wrapper merges
+ * it into the suggester (configured order first, then in-use extras).
+ *
+ * The cache deliberately OUTLIVES the view: Bases tears a board view down
+ * whenever its tab goes to the background, which is exactly when the user is
+ * editing a note's property — so unpatching on view close would remove the
+ * options at the moment they're needed. The original function is restored
+ * only on plugin unload (restorePropertySuggester, called from main.ts).
  */
 const SUGGESTER_FN_KEY = 'getFrontmatterPropertyValuesForKey';
 type PropertyValuesFn = (key: string) => unknown;
 const isPropertyValuesFn = (value: unknown): value is PropertyValuesFn => typeof value === 'function';
-const suggesterProviders = new Set<KanbanView>();
+const suggesterOptions = new Map<string, string[]>();
 let suggesterPatch: { cache: object; original: PropertyValuesFn } | null = null;
+
+/** Restore the original suggester function. Call only on plugin unload. */
+export function restorePropertySuggester(): void {
+	suggesterOptions.clear();
+	if (suggesterPatch) {
+		Reflect.set(suggesterPatch.cache, SUGGESTER_FN_KEY, suggesterPatch.original);
+		suggesterPatch = null;
+	}
+}
 
 function isStringArrayRecord(value: unknown): value is Record<string, string[]> {
 	return isRecord(value) && !Array.isArray(value) && Object.values(value).every(isStringArray);
@@ -408,29 +422,26 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * Register this view as a suggester provider and install the merge wrapper
-	 * on the metadataCache if not yet installed (see suggesterProviders above).
-	 * No-op on hosts that don't expose the internal API.
+	 * Store this board's full option list in the module-level cache and install
+	 * the merge wrapper on the metadataCache if not yet installed (see
+	 * suggesterOptions above). No-op on hosts without the internal API.
 	 */
 	private _patchPropertySuggester(): void {
+		const propertyName = this._suggesterPropertyName();
+		if (!propertyName) return;
 		const cache = this.app?.metadataCache;
 		if (!cache) return;
 		const current: unknown = Reflect.get(cache, SUGGESTER_FN_KEY);
 		if (!isPropertyValuesFn(current)) return;
-		suggesterProviders.add(this);
+		suggesterOptions.set(propertyName, [...this._cardColorValues]);
 		if (suggesterPatch) return;
 		const original = current;
 		const wrapper = (key: string): unknown => {
 			const raw: unknown = original.call(cache, key);
+			const options = suggesterOptions.get(key);
+			if (!options || options.length === 0) return raw;
 			const base: unknown[] = Array.isArray(raw) ? raw : [];
-			const merged: unknown[] = [];
-			for (const view of suggesterProviders) {
-				if (view._suggesterPropertyName() !== key) continue;
-				for (const value of view._cardColorValues) {
-					if (!merged.includes(value)) merged.push(value);
-				}
-			}
-			if (merged.length === 0) return raw;
+			const merged: unknown[] = [...options];
 			for (const value of base) {
 				if (!merged.includes(value)) merged.push(value);
 			}
@@ -438,15 +449,6 @@ export class KanbanView extends BasesView {
 		};
 		Reflect.set(cache, SUGGESTER_FN_KEY, wrapper);
 		suggesterPatch = { cache, original };
-	}
-
-	/** Drop this view as a provider; restore the original when none remain. */
-	private _unpatchPropertySuggester(): void {
-		suggesterProviders.delete(this);
-		if (suggesterProviders.size === 0 && suggesterPatch) {
-			Reflect.set(suggesterPatch.cache, SUGGESTER_FN_KEY, suggesterPatch.original);
-			suggesterPatch = null;
-		}
 	}
 
 	private triggerHoverPreview(linktext: string, sourcePath: string, event: MouseEvent, targetEl: HTMLElement): void {
@@ -2100,7 +2102,9 @@ export class KanbanView extends BasesView {
 			this._metadataChangeRef = null;
 		}
 		this._debouncedRender.cancel();
-		this._unpatchPropertySuggester();
+		// NOTE: the property-suggester patch is deliberately NOT removed here —
+		// Bases closes the view whenever its tab goes background, which is when
+		// the user edits note properties. main.ts restores it on plugin unload.
 		// Flush any in-session pref changes (card/column order, colors, widths) to
 		// the .base config now. We deliberately never write config during a session
 		// because each write makes the Bases host rebuild the whole view (a visible
