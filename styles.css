@@ -231,8 +231,11 @@
 
 /* In swimlane mode, each lane grows tall enough to fit the fullest column,
    and shorter column bodies stretch to that height so their Sortable drop
-   target spans the whole lane row. */
+   target spans the whole lane row. Columns also grow to fill available width
+   so empty-column gaps are eliminated. */
 .obk-board--with-swimlanes .obk-column {
+	flex: 1 1 var(--obk-column-width, clamp(200px, 60cqw, 280px));
+	min-width: var(--obk-column-width, clamp(200px, 60cqw, 280px));
 	min-height: 0;
 	max-height: none;
 	height: auto;

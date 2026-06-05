@@ -1294,7 +1294,8 @@ export class KanbanView extends BasesView {
 			const orderedLanes = this.getOrderedSwimlaneValues(liveLaneValues);
 			orderedLanes.forEach((laneValue) => {
 				const laneEntries = lanes.get(laneValue) ?? new Map<string, BasesEntry[]>();
-				const laneEl = this._buildSwimlaneElement(laneValue, laneEntries, orderedColumnValues);
+				const laneColumns = this._filterLaneColumns(orderedColumnValues, laneEntries);
+				const laneEl = this._buildSwimlaneElement(laneValue, laneEntries, laneColumns);
 				boardEl.appendChild(laneEl);
 				const bodyEl = laneEl.querySelector<HTMLElement>(`.${CSS_CLASSES.SWIMLANE_BODY}`);
 				if (bodyEl) this.swimlaneColumnSortables.set(laneValue, this._createColumnSortable(bodyEl));
@@ -1329,6 +1330,18 @@ export class KanbanView extends BasesView {
 			attachCardSortable: (body, key) => this.attachCardSortable(body, key),
 			cardOrderKey: (laneVal, colVal) => this.cardOrderKey(laneVal, colVal),
 		};
+	}
+
+	/**
+	 * Filter column values to only those with at least one entry in this lane.
+	 * When the lane itself is empty, returns all columns so the user can still
+	 * see and manage the config. Shared by fullRebuild and patchBoard.
+	 */
+	private _filterLaneColumns(allColumns: string[], laneEntries: Map<string, BasesEntry[]>): string[] {
+		const hasAnyInLane = [...laneEntries.values()].some((es) => es.length > 0);
+		if (!hasAnyInLane) return allColumns;
+		const visible = allColumns.filter((v) => (laneEntries.get(v)?.length ?? 0) > 0);
+		return visible.length > 0 ? visible : allColumns;
 	}
 
 	private _buildSwimlaneElement(
@@ -1484,8 +1497,9 @@ export class KanbanView extends BasesView {
 			// Patch or create lanes
 			orderedLanes.forEach((laneValue) => {
 				const laneEntries = lanes.get(laneValue) ?? new Map<string, BasesEntry[]>();
+				const laneColumns = this._filterLaneColumns(orderedColumnValues, laneEntries);
 				if (!existingLanes.has(laneValue)) {
-					const laneEl = this._buildSwimlaneElement(laneValue, laneEntries, orderedColumnValues);
+					const laneEl = this._buildSwimlaneElement(laneValue, laneEntries, laneColumns);
 					boardEl.appendChild(laneEl);
 					existingLanes.set(laneValue, laneEl);
 					const bodyEl = laneEl.querySelector<HTMLElement>(`.${CSS_CLASSES.SWIMLANE_BODY}`);
@@ -1503,9 +1517,9 @@ export class KanbanView extends BasesView {
 							const count = orderedColumnValues.reduce((sum, col) => sum + (laneEntries.get(col)?.length ?? 0), 0);
 							countEl.textContent = `${count}`;
 						}
-						// Patch columns within lane body
+						// Patch columns within lane body (using per-lane visible columns)
 						const bodyEl = laneEl.querySelector<HTMLElement>(`.${CSS_CLASSES.SWIMLANE_BODY}`);
-						if (bodyEl) this._patchColumns(bodyEl, orderedColumnValues, laneEntries, laneValue);
+						if (bodyEl) this._patchColumns(bodyEl, laneColumns, laneEntries, laneValue);
 					}
 				}
 			});
