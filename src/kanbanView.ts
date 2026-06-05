@@ -634,6 +634,12 @@ export class KanbanView extends BasesView {
 	private _minimalMode = false;
 	private _minimalToggleEl: HTMLElement | null = null;
 	private _minimalRetryScheduled = false;
+	/** Like _minimalModeDirty, but for masonryMode. Flushed on close. */
+	private _masonryModeDirty = false;
+	private _masonryMode = false;
+	private _masonryToggleEl: HTMLElement | null = null;
+	private _masonryRetryScheduled = false;
+	private _lastMasonryEntriesKey = '';
 	private _toolbarObserver: MutationObserver | null = null;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, legacyData: LegacyData | null = null) {
@@ -704,6 +710,7 @@ export class KanbanView extends BasesView {
 		this.imagePropertyId = this.config.getAsPropertyId('imageProperty');
 		this.cardColorPropertyId = this.config.getAsPropertyId('cardColorProperty');
 		this._minimalMode = this.config.get('minimalMode') === true;
+		this._masonryMode = this.config.get('masonryMode') === true;
 	}
 
 	/**
@@ -948,6 +955,10 @@ export class KanbanView extends BasesView {
 				this._minimalModeDirty = false;
 				this.config?.set('minimalMode', this._minimalMode);
 			}
+			if (this._masonryModeDirty) {
+				this._masonryModeDirty = false;
+				this.config?.set('masonryMode', this._masonryMode);
+			}
 			if (this._prefsDirty && this._prefsPropertyId) {
 				this._prefsDirty = false;
 				const swimlaneScopedKey = this._prefsSwimlanePropertyId
@@ -1054,6 +1065,32 @@ export class KanbanView extends BasesView {
 
 			// Global column width slider → CSS variable on the container.
 			this._applyGlobalColumnWidth();
+
+			// Masonry mode: bypass column layout, render flat card gallery.
+			if (this._masonryMode) {
+				// Clear any existing kanban board (switching from kanban → masonry).
+				if (this.containerEl.querySelector(`.${CSS_CLASSES.BOARD}`)) {
+					this.destroySortables();
+					this.containerEl.empty();
+				}
+				const cols = Math.max(2, Math.min(8, Number(this.config?.get('masonryColumns')) || 4));
+				this.containerEl.style.setProperty('--obk-masonry-columns', String(cols));
+				const entriesKey = entries.map((e) => e.file.path).join('\0') + `|${cols}`;
+				if (
+					!this.containerEl.querySelector(`.${CSS_CLASSES.MASONRY_BOARD}`) ||
+					this._lastMasonryEntriesKey !== entriesKey
+				) {
+					this._lastMasonryEntriesKey = entriesKey;
+					this._renderMasonry(entries);
+				}
+				this._applyMinimalMode();
+				this._ensureMinimalToggle();
+				this._ensureMasonryToggle();
+				return;
+			}
+			// Leaving masonry mode — the masonry board will be cleared by fullRebuild
+			// below (existingBoard is null when no .obk-board exists).
+			this._ensureMasonryToggle();
 
 			// Group entries — 2D when swimlanes are active, 1D otherwise. The
 			// column-axis preference logic (order, colors, new-value detection)
@@ -1182,6 +1219,7 @@ export class KanbanView extends BasesView {
 			this.reapplyActiveCard();
 			this._applyMinimalMode();
 			this._ensureMinimalToggle();
+			this._ensureMasonryToggle();
 		} catch (error) {
 			console.error('KanbanView error:', error);
 		}
@@ -1701,6 +1739,100 @@ export class KanbanView extends BasesView {
 		}
 	}
 
+	/** Render all entries as a flat CSS multi-column card gallery (masonry layout). */
+	private _renderMasonry(entries: BasesEntry[]): void {
+		this.containerEl.empty();
+		this.containerEl.classList.remove(CSS_CLASSES.VIEW_CONTAINER_WITH_SWIMLANES);
+		const boardEl = this.containerEl.createDiv({ cls: CSS_CLASSES.MASONRY_BOARD });
+		const ctx = this._buildCardCtx();
+		const callbacks = this._buildCardCallbacks();
+		for (const entry of entries) {
+			boardEl.appendChild(createCardEl(entry, ctx, callbacks));
+		}
+	}
+
+	private _ensureMasonryToggle(): void {
+		const toolbarItems = this._findBasesToolbar();
+		const home = toolbarItems ?? this.containerEl;
+		const scope =
+			this.containerEl.closest('.workspace-leaf') ?? this.containerEl.closest('.workspace-leaf-content') ?? home;
+		scope.querySelectorAll(`.${CSS_CLASSES.MASONRY_TOGGLE}`).forEach((el) => {
+			if (el !== this._masonryToggleEl) el.remove();
+		});
+
+		const placed = this._masonryToggleEl?.isConnected ?? false;
+		const inToolbar = !!(toolbarItems && this._masonryToggleEl && toolbarItems.contains(this._masonryToggleEl));
+
+		if (!placed || (toolbarItems && !inToolbar)) {
+			this._masonryToggleEl?.remove();
+			this._masonryToggleEl = this._createMasonryToggle(toolbarItems);
+		}
+		this._updateMasonryToggleState();
+
+		if (!toolbarItems && !this._masonryRetryScheduled) {
+			this._masonryRetryScheduled = true;
+			let tries = 0;
+			const retry = () => {
+				if (this._findBasesToolbar()) {
+					this._masonryRetryScheduled = false;
+					this._ensureMasonryToggle();
+				} else if (++tries < 12) {
+					window.setTimeout(retry, 150);
+				} else {
+					this._masonryRetryScheduled = false;
+				}
+			};
+			window.setTimeout(retry, 150);
+		}
+	}
+
+	private _createMasonryToggle(toolbarItems: HTMLElement | null): HTMLElement {
+		const inToolbar = toolbarItems !== null;
+		const parent = toolbarItems ?? this.containerEl;
+		const cls = inToolbar ? `bases-toolbar-item ${CSS_CLASSES.MASONRY_TOGGLE}` : `${CSS_CLASSES.MASONRY_TOGGLE}`;
+		const btn = parent.createDiv({ cls });
+		btn.setAttribute('role', 'button');
+		btn.setAttribute('tabindex', '0');
+		btn.setAttribute('aria-label', t('label.masonryMode'));
+
+		const iconEl = btn.createSpan({ cls: CSS_CLASSES.MASONRY_TOGGLE_ICON });
+		setIcon(iconEl, 'layout-grid');
+		btn.createSpan({ text: t('label.masonryShort') });
+
+		const toggle = () => {
+			this._masonryMode = !this._masonryMode;
+			this._masonryModeDirty = true;
+			if (!this._masonryMode) {
+				// Leaving masonry: clear masonry board so render() sees no .obk-board
+				// and forces a fullRebuild of the kanban layout.
+				if (this.containerEl.querySelector(`.${CSS_CLASSES.MASONRY_BOARD}`)) {
+					this.containerEl.empty();
+				}
+			}
+			this._updateMasonryToggleState();
+			this._debouncedRender();
+		};
+		btn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			toggle();
+		});
+		btn.addEventListener('keydown', (e) => {
+			if (e.key !== 'Enter' && e.key !== ' ') return;
+			e.preventDefault();
+			toggle();
+		});
+		return btn;
+	}
+
+	private _updateMasonryToggleState(): void {
+		const btn = this._masonryToggleEl;
+		if (!btn) return;
+		btn.classList.toggle(CSS_CLASSES.MASONRY_TOGGLE_ACTIVE, this._masonryMode);
+		const iconEl = btn.querySelector<HTMLElement>(`.${CSS_CLASSES.MASONRY_TOGGLE_ICON}`);
+		if (iconEl) setIcon(iconEl, this._masonryMode ? 'layout-list' : 'layout-grid');
+		btn.setAttribute('aria-pressed', String(this._masonryMode));
+	}
+
 	/** Toggle the minimal-mode class (hides property labels) on the container. */
 	private _applyMinimalMode(): void {
 		this.containerEl.classList.toggle(CSS_CLASSES.MINIMAL, this._minimalMode);
@@ -1785,10 +1917,11 @@ export class KanbanView extends BasesView {
 		const observer = new MutationObserver(() => {
 			const toolbar = this._findBasesToolbar();
 			// Re-inject only when the toolbar exists but no longer holds our
-			// button. The contains() check also stops our own insert (which
+			// buttons. The contains() check also stops our own insert (which
 			// mutates the header) from triggering an infinite loop.
 			if (toolbar && (!this._minimalToggleEl || !toolbar.contains(this._minimalToggleEl))) {
 				this._ensureMinimalToggle();
+				this._ensureMasonryToggle();
 			}
 		});
 		observer.observe(header, { childList: true, subtree: true });
@@ -2553,6 +2686,15 @@ export class KanbanView extends BasesView {
 				min: 200,
 				max: 520,
 				step: 10,
+			},
+			{
+				displayName: t('option.masonryColumns'),
+				type: 'slider',
+				key: 'masonryColumns',
+				default: 4,
+				min: 2,
+				max: 8,
+				step: 1,
 			},
 		];
 	}

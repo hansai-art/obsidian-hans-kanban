@@ -75,6 +75,38 @@
 	display: none;
 }
 
+/* Masonry (瀑布) mode toggle — same structure as minimal toggle. */
+.obk-masonry-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+}
+
+.obk-masonry-toggle-icon {
+	display: inline-flex;
+	align-items: center;
+}
+
+.obk-masonry-toggle--active {
+	color: var(--text-accent);
+}
+
+/* Masonry board: CSS multi-column card gallery. */
+.obk-masonry-board {
+	column-count: var(--obk-masonry-columns, 4);
+	column-gap: 8px;
+	padding: 8px;
+	overflow-y: auto;
+	flex: 1;
+}
+
+.obk-masonry-board .obk-card {
+	break-inside: avoid;
+	margin-bottom: 8px;
+	display: block;
+}
+
 /* Property Selector */
 .obk-property-selector {
 	margin-bottom: 15px;

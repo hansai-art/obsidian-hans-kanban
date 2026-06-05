@@ -210,6 +210,12 @@ export const CSS_CLASSES = {
 	MINIMAL_TOGGLE_ACTIVE: 'obk-minimal-toggle--active',
 	MINIMAL_TOGGLE_FLOATING: 'obk-minimal-toggle--floating',
 
+	// Masonry (flow) mode: cards flow in a CSS column-count grid, no groupBy columns.
+	MASONRY_BOARD: 'obk-masonry-board',
+	MASONRY_TOGGLE: 'obk-masonry-toggle',
+	MASONRY_TOGGLE_ICON: 'obk-masonry-toggle-icon',
+	MASONRY_TOGGLE_ACTIVE: 'obk-masonry-toggle--active',
+
 	// Quick add modal
 	QUICK_ADD_FORM: 'obk-quick-add-form',
 	QUICK_ADD_INPUT: 'obk-quick-add-input',

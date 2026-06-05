@@ -21,8 +21,11 @@ export const zhTW: Record<StringKey, string> = {
 	'option.imageFit.contain': '完整顯示',
 	'option.imageAspectRatio': '圖片長寬比',
 	'option.wrapPropertyValues': '值換行顯示',
+	'option.masonryColumns': '瀑布欄數',
 
 	'label.uncategorized': '未分類',
+	'label.masonryMode': '瀑布模式（流動格）',
+	'label.masonryShort': '瀑布',
 	'label.noColor': '無顏色',
 	'label.pickColor': '選擇顏色',
 	'label.minimalMode': '極簡模式（隱藏標籤）',
