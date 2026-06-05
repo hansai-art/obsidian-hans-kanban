@@ -1073,7 +1073,7 @@ export class KanbanView extends BasesView {
 					this.destroySortables();
 					this.containerEl.empty();
 				}
-				const cols = Math.max(2, Math.min(8, Number(this.config?.get('masonryColumns')) || 4));
+				const cols = Math.max(2, Math.min(12, Number(this.config?.get('masonryColumns')) || 4));
 				this.containerEl.style.setProperty('--obk-masonry-columns', String(cols));
 				const entriesKey = entries.map((e) => e.file.path).join('\0') + `|${cols}`;
 				if (
@@ -1211,10 +1211,25 @@ export class KanbanView extends BasesView {
 			const existingIsSwimlane = existingBoard?.classList.contains(CSS_CLASSES.BOARD_WITH_SWIMLANES) ?? false;
 			const modeChanged = hasSwimlanes !== existingIsSwimlane;
 
+			// Hide columns with no entries (when there are entries in the board).
+			// Keeps all saved columns when the board is entirely empty (config mode).
+			const valuesToRender =
+				entries.length > 0
+					? (() => {
+							const nonEmpty = orderedValues.filter((v) => {
+								for (const cols of lanes.values()) {
+									if ((cols.get(v)?.length ?? 0) > 0) return true;
+								}
+								return false;
+							});
+							return nonEmpty.length > 0 ? nonEmpty : orderedValues;
+						})()
+					: orderedValues;
+
 			if (!existingBoard || modeChanged || groupChanged || optionsChanged) {
-				this.fullRebuild(orderedValues, lanes, hasSwimlanes);
+				this.fullRebuild(valuesToRender, lanes, hasSwimlanes);
 			} else {
-				this.patchBoard(orderedValues, lanes, hasSwimlanes);
+				this.patchBoard(valuesToRender, lanes, hasSwimlanes);
 			}
 			this.reapplyActiveCard();
 			this._applyMinimalMode();
@@ -2693,7 +2708,7 @@ export class KanbanView extends BasesView {
 				key: 'masonryColumns',
 				default: 4,
 				min: 2,
-				max: 8,
+				max: 12,
 				step: 1,
 			},
 		];
