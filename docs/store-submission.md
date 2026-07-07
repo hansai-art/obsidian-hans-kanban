@@ -63,7 +63,7 @@ substantially different feature set:
 - [x] `name` 無 "Obsidian" / "plugin" 字樣
 - [x] description ≤ 250 字元、以句號結尾、無 "Obsidian"/"plugin" 字樣
 - [x] manifest.json 的 id / name / author / description 與送審 JSON 完全一致
-- [x] Release tag 無 `v` 前綴（`1.1.0`）
+- [x] Release tag 無 `v` 前綴（現行最新 `1.2.0`；發版流程 = 改 manifest/package/versions.json 版本號 → push main → ci.yml 自動 tag + release）
 - [x] `versions.json` 含 `"1.1.0": "1.10.2"`
 
 ## 已知審查風險與應答準備
