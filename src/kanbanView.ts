@@ -758,8 +758,12 @@ export class KanbanView extends BasesView {
 		this.imagePropertyId = this.config.getAsPropertyId('imageProperty');
 		this.cardColorPropertyId = this.config.getAsPropertyId('cardColorProperty');
 		this.masonrySortPropertyId = this.config.getAsPropertyId('masonrySortProperty');
-		this._minimalMode = this.config.get('minimalMode') === true;
-		this._masonryMode = this.config.get('masonryMode') === true;
+		// Unflushed in-session toggles win over config: the toolbar defers its
+		// config.set to close (a mid-session write makes the host rebuild the
+		// view = flash), so until then the stored value is stale and reading it
+		// here would silently revert the toggle on the very render it triggered.
+		if (!this._minimalModeDirty) this._minimalMode = this.config.get('minimalMode') === true;
+		if (!this._masonryModeDirty) this._masonryMode = this.config.get('masonryMode') === true;
 	}
 
 	/**

@@ -1,11 +1,12 @@
 import assert from 'node:assert';
-import { beforeEach, describe, test } from 'node:test';
+import { beforeEach, describe, mock, test } from 'node:test';
 import { Notice } from 'obsidian';
 import type { BasesPropertyId } from 'obsidian';
 import {
 	COLOR_NAME_TO_EMOJI,
 	COLOR_PALETTE,
 	CSS_CLASSES,
+	DEBOUNCE_DELAY,
 	HOVER_LINK_SOURCE_ID,
 	SORTABLE_CONFIG,
 	SORTABLE_GROUP,
@@ -4772,6 +4773,37 @@ describe('Unconfigured view foolproofing', () => {
 
 		assert.strictEqual(view.containerEl.querySelector('.obk-onboarding'), null);
 		assert.ok(view.containerEl.querySelector('.obk-masonry-board'), 'Masonry board should render');
+	});
+
+	// Regression (1.3.1): the toggle defers its config.set to close, so the
+	// loadConfig() inside the debounced render used to read the stale stored
+	// value and revert _masonryMode on the very render the click triggered —
+	// the button looked completely dead.
+	test('Masonry toolbar toggle switches to the card wall and back', () => {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = (key: string) => (key === 'groupByProperty' ? PROPERTY_STATUS : null);
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+		assert.ok(view.containerEl.querySelectorAll('.obk-column').length > 0, 'starts as a kanban board');
+
+		const clickToggle = () => {
+			const toggle = view.containerEl.querySelector<HTMLElement>('.obk-masonry-toggle');
+			assert.ok(toggle, 'masonry toggle rendered');
+			mock.timers.enable({ apis: ['setTimeout'] });
+			toggle.click();
+			mock.timers.tick(DEBOUNCE_DELAY);
+			mock.timers.reset();
+		};
+
+		clickToggle();
+		assert.ok(view.containerEl.querySelector('.obk-masonry-board'), 'toggle on: masonry card wall renders');
+		assert.strictEqual(view.containerEl.querySelectorAll('.obk-column').length, 0, 'columns cleared');
+
+		clickToggle();
+		assert.strictEqual(view.containerEl.querySelector('.obk-masonry-board'), null, 'toggle off: masonry cleared');
+		assert.ok(view.containerEl.querySelectorAll('.obk-column').length > 0, 'kanban columns are back');
 	});
 
 	test('Fresh view auto-inherits the first configured sibling view', async () => {
