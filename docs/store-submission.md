@@ -1,6 +1,6 @@
 # Obsidian 社群商店送審稿（待 Hans 過目後送出）
 
-> 狀態：草稿。GitHub Release 1.1.0 已上線，三個 assets（main.js / manifest.json / styles.css）驗證可下載。
+> 狀態：草稿。GitHub Release 最新 1.3.0 已上線，三個 assets（main.js / manifest.json / styles.css）驗證可下載。
 > 送出方式：fork [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases)，把下方 JSON 加到 `community-plugins.json` 陣列**最尾端**，開 PR。
 
 ## community-plugins.json 條目
@@ -32,7 +32,7 @@ https://github.com/hansai-art/obsidian-hans-kanban
 
 ## Release Checklist
 - [x] I have tested the plugin on Windows / macOS (primary), and it declares `isDesktopOnly: false`
-- [x] GitHub release `1.1.0` contains `main.js`, `manifest.json`, `styles.css`; tag matches `manifest.json` version
+- [x] GitHub release `1.3.0` contains `main.js`, `manifest.json`, `styles.css`; tag matches `manifest.json` version
 - [x] `README.md` describes the plugin's purpose and usage in English (Traditional Chinese section included)
 - [x] MIT `LICENSE` present, original author's copyright retained
 
@@ -63,7 +63,7 @@ substantially different feature set:
 - [x] `name` 無 "Obsidian" / "plugin" 字樣
 - [x] description ≤ 250 字元、以句號結尾、無 "Obsidian"/"plugin" 字樣
 - [x] manifest.json 的 id / name / author / description 與送審 JSON 完全一致
-- [x] Release tag 無 `v` 前綴（現行最新 `1.2.0`；發版流程 = 改 manifest/package/versions.json 版本號 → push main → ci.yml 自動 tag + release）
+- [x] Release tag 無 `v` 前綴（現行最新 `1.3.0`；發版流程 = 改 manifest/package/versions.json 版本號 → push main → ci.yml 自動 tag + release）
 - [x] `versions.json` 含 `"1.1.0": "1.10.2"`
 
 ## 已知審查風險與應答準備
