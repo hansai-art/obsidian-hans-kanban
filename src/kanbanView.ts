@@ -531,6 +531,13 @@ export function isCollapsedLanes(value: unknown): value is Record<string, string
 	return isStringArrayRecord(value);
 }
 
+/** Narrow a raw config value to a BasesPropertyId ('note.x' / 'file.x' / 'formula.x'). */
+function isBasesPropertyId(value: unknown): value is BasesPropertyId {
+	return (
+		typeof value === 'string' && (value.startsWith('note.') || value.startsWith('file.') || value.startsWith('formula.'))
+	);
+}
+
 export class KanbanView extends BasesView {
 	type = 'kanban-view';
 	hoverPopover: HoverPopover | null = null;
@@ -543,6 +550,7 @@ export class KanbanView extends BasesView {
 	private cardTitlePropertyId: BasesPropertyId | null = null;
 	private imagePropertyId: BasesPropertyId | null = null;
 	private cardColorPropertyId: BasesPropertyId | null = null;
+	private masonrySortPropertyId: BasesPropertyId | null = null;
 	private _lastCardColorPropertyId: BasesPropertyId | null = null;
 	private _lastCardColorOrderKey = '[]';
 	/** Per-render cache: distinct card-color values + value→css-color map. */
@@ -709,6 +717,7 @@ export class KanbanView extends BasesView {
 		this.cardTitlePropertyId = this.config.getAsPropertyId('cardTitleProperty');
 		this.imagePropertyId = this.config.getAsPropertyId('imageProperty');
 		this.cardColorPropertyId = this.config.getAsPropertyId('cardColorProperty');
+		this.masonrySortPropertyId = this.config.getAsPropertyId('masonrySortProperty');
 		this._minimalMode = this.config.get('minimalMode') === true;
 		this._masonryMode = this.config.get('masonryMode') === true;
 	}
@@ -1075,7 +1084,13 @@ export class KanbanView extends BasesView {
 				}
 				const cols = Math.max(2, Math.min(12, Number(this.config?.get('masonryColumns')) || 4));
 				this.containerEl.style.setProperty('--obk-masonry-columns', String(cols));
-				const entriesKey = entries.map((e) => e.file.path).join('\0') + `|${cols}`;
+				const colorPropId = this.cardColorPropertyId;
+				const sortPropId = this.masonrySortPropertyId;
+				const entriesKey =
+					entries.map((e) => e.file.path).join('\0') +
+					`|${cols}` +
+					(colorPropId ? `|${entries.map((e) => String(e.getValue(colorPropId) ?? '')).join('\0')}` : '') +
+					(sortPropId ? `|sort:${entries.map((e) => String(e.getValue(sortPropId) ?? '')).join('\0')}` : '');
 				if (
 					!this.containerEl.querySelector(`.${CSS_CLASSES.MASONRY_BOARD}`) ||
 					this._lastMasonryEntriesKey !== entriesKey
@@ -1775,7 +1790,38 @@ export class KanbanView extends BasesView {
 		const boardEl = this.containerEl.createDiv({ cls: CSS_CLASSES.MASONRY_BOARD });
 		const ctx = this._buildCardCtx();
 		const callbacks = this._buildCardCallbacks();
-		for (const entry of entries) {
+		// Sort by cardColorOrder first, then masonrySortProperty (desc) when no Bases sort is active
+		let sorted = entries;
+		if (!this.hasActiveSort()) {
+			const colorOrderMap =
+				this.cardColorPropertyId && this._cardColorValues.length > 0
+					? new Map(this._cardColorValues.map((v, i) => [v, i]))
+					: null;
+			const maxColorIdx = this._cardColorValues.length;
+			// Fallback: if getAsPropertyId failed, use raw config string directly as property ID
+			const rawSortProperty = this.config.get('masonrySortProperty');
+			const sortPropId = this.masonrySortPropertyId ?? (isBasesPropertyId(rawSortProperty) ? rawSortProperty : null);
+			sorted = [...entries].sort((a, b) => {
+				// Primary: cardColorOrder
+				if (colorOrderMap && this.cardColorPropertyId) {
+					const av = String(a.getValue(this.cardColorPropertyId) ?? '');
+					const bv = String(b.getValue(this.cardColorPropertyId) ?? '');
+					const colorCmp = (colorOrderMap.get(av) ?? maxColorIdx) - (colorOrderMap.get(bv) ?? maxColorIdx);
+					if (colorCmp !== 0) return colorCmp;
+				}
+				// Secondary: masonrySortProperty descending — count ⭐ chars, empty → last
+				if (sortPropId) {
+					const av = String(a.getValue(sortPropId) ?? '');
+					const bv = String(b.getValue(sortPropId) ?? '');
+					const countStars = (s: string) => (s === '' ? -1 : [...s].filter((c) => c === '⭐').length || Number(s) || 0);
+					const an = countStars(av);
+					const bn = countStars(bv);
+					if (bn !== an) return bn - an;
+				}
+				return 0;
+			});
+		}
+		for (const entry of sorted) {
 			boardEl.appendChild(createCardEl(entry, ctx, callbacks));
 		}
 	}
