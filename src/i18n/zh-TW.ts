@@ -21,6 +21,7 @@ export const zhTW: Record<StringKey, string> = {
 	'option.imageFit.contain': '完整顯示',
 	'option.imageAspectRatio': '圖片長寬比',
 	'option.wrapPropertyValues': '值換行顯示',
+	'option.hideEmptyColumns': '隱藏空欄位',
 	'option.masonryColumns': '瀑布欄數',
 
 	'label.uncategorized': '未分類',

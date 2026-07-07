@@ -4610,3 +4610,59 @@ describe('Card Color - auto-color and custom override', () => {
 		assert.strictEqual(fm.other, 'Backlog', 'non-color property values must be written verbatim');
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Hide empty columns option (hideEmptyColumns, default off)
+// ---------------------------------------------------------------------------
+
+describe('Hide empty columns option', () => {
+	let scrollEl: HTMLElement;
+	let controller: any;
+	let app: any;
+
+	beforeEach(() => {
+		scrollEl = createDivWithMethods();
+		app = createMockApp();
+	});
+
+	function buildView(hideEmptyColumns: boolean) {
+		const entries = createEntriesWithStatus(); // To Do, Doing, Done
+		controller = createMockQueryController(entries, TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = () => PROPERTY_STATUS;
+		controller.config.set('columnOrders', {
+			[PROPERTY_STATUS]: ['To Do', 'Doing', 'Done', 'In Progress'],
+		});
+		controller.config.set('hideEmptyColumns', hideEmptyColumns);
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+		return view;
+	}
+
+	function columnValues(view: KanbanView): (string | null)[] {
+		return Array.from(view.containerEl.querySelectorAll('.obk-column')).map((col) =>
+			col.getAttribute('data-column-value'),
+		);
+	}
+
+	test('Option on: saved column with no live entries is hidden', () => {
+		const view = buildView(true);
+		const values = columnValues(view);
+		assert.ok(!values.includes('In Progress'), 'Empty saved column should be hidden when option is on');
+		assert.ok(values.includes('To Do'), 'Non-empty columns still render');
+	});
+
+	test('Option off (default): saved column with no live entries stays visible', () => {
+		const view = buildView(false);
+		assert.ok(columnValues(view).includes('In Progress'), 'Empty saved column should render when option is off');
+	});
+
+	test('Toggling the option off re-renders the hidden column', () => {
+		const view = buildView(true);
+		assert.ok(!columnValues(view).includes('In Progress'));
+		controller.config.set('hideEmptyColumns', false);
+		triggerDataUpdate(view);
+		assert.ok(columnValues(view).includes('In Progress'), 'Column should reappear after toggling the option off');
+	});
+});

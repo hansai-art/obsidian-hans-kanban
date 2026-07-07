@@ -626,6 +626,7 @@ export class KanbanView extends BasesView {
 	 */
 	private _lastOrderKey: string = '';
 	private _lastWrapValue: boolean | null = null;
+	private _lastHideEmpty: boolean | null = null;
 	private _lastCardTitlePropertyId: BasesPropertyId | null | undefined = undefined;
 	private _lastImagePropertyId: BasesPropertyId | null | undefined = undefined;
 	private _lastImageFit: string | undefined = undefined;
@@ -1226,6 +1227,10 @@ export class KanbanView extends BasesView {
 			const wrapChanged = currentWrapValue !== this._lastWrapValue;
 			this._lastWrapValue = currentWrapValue;
 
+			const currentHideEmpty = this.config?.get('hideEmptyColumns') === true;
+			const hideEmptyChanged = currentHideEmpty !== this._lastHideEmpty;
+			this._lastHideEmpty = currentHideEmpty;
+
 			const currentCardTitlePropertyId = this.cardTitlePropertyId;
 			const cardTitleChanged = currentCardTitlePropertyId !== this._lastCardTitlePropertyId;
 			this._lastCardTitlePropertyId = currentCardTitlePropertyId;
@@ -1264,6 +1269,7 @@ export class KanbanView extends BasesView {
 			const optionsChanged =
 				orderChanged ||
 				wrapChanged ||
+				hideEmptyChanged ||
 				cardTitleChanged ||
 				imagePropertyChanged ||
 				imageFitChanged ||
@@ -1282,10 +1288,10 @@ export class KanbanView extends BasesView {
 			const existingIsSwimlane = existingBoard?.classList.contains(CSS_CLASSES.BOARD_WITH_SWIMLANES) ?? false;
 			const modeChanged = hasSwimlanes !== existingIsSwimlane;
 
-			// Hide columns with no entries (when there are entries in the board).
-			// Keeps all saved columns when the board is entirely empty (config mode).
+			// Optionally hide columns with no entries (hideEmptyColumns view option,
+			// default off). Keeps all saved columns when the board is entirely empty.
 			const valuesToRender =
-				entries.length > 0
+				currentHideEmpty && entries.length > 0
 					? (() => {
 							const nonEmpty = orderedValues.filter((v) => {
 								for (const cols of lanes.values()) {
@@ -1409,6 +1415,7 @@ export class KanbanView extends BasesView {
 	 * see and manage the config. Shared by fullRebuild and patchBoard.
 	 */
 	private _filterLaneColumns(allColumns: string[], laneEntries: Map<string, BasesEntry[]>): string[] {
+		if (this.config?.get('hideEmptyColumns') !== true) return allColumns;
 		const hasAnyInLane = [...laneEntries.values()].some((es) => es.length > 0);
 		if (!hasAnyInLane) return allColumns;
 		const visible = allColumns.filter((v) => (laneEntries.get(v)?.length ?? 0) > 0);
@@ -2862,6 +2869,11 @@ export class KanbanView extends BasesView {
 				displayName: t('option.wrapPropertyValues'),
 				type: 'toggle',
 				key: 'wrapPropertyValues',
+			},
+			{
+				displayName: t('option.hideEmptyColumns'),
+				type: 'toggle',
+				key: 'hideEmptyColumns',
 			},
 			{
 				displayName: t('option.columnWidth'),

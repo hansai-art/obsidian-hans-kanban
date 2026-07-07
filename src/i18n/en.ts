@@ -19,6 +19,7 @@ export const en = {
 	'option.imageFit.contain': 'Contain',
 	'option.imageAspectRatio': 'Image aspect ratio',
 	'option.wrapPropertyValues': 'Wrap property values',
+	'option.hideEmptyColumns': 'Hide empty columns',
 	'option.masonryColumns': 'Flow columns',
 
 	'label.uncategorized': 'Uncategorized',
