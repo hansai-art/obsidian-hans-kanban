@@ -11,6 +11,7 @@ import type {
 } from 'obsidian';
 import { BasesView, Keymap, Notice, normalizePath, parsePropertyId } from 'obsidian';
 import { ToolbarToggleGroup } from './toolbar.ts';
+import { compareSortValuesDesc } from './utils/sortValue.ts';
 import {
 	createCard as createCardEl,
 	computeCardFingerprint,
@@ -1867,14 +1868,13 @@ export class KanbanView extends BasesView {
 					const colorCmp = (colorOrderMap.get(av) ?? maxColorIdx) - (colorOrderMap.get(bv) ?? maxColorIdx);
 					if (colorCmp !== 0) return colorCmp;
 				}
-				// Secondary: masonrySortProperty descending — count ⭐ chars, empty → last
+				// Secondary: masonrySortProperty descending (stars / numbers / text,
+				// empty always last) — see compareSortValuesDesc.
 				if (sortPropId) {
 					const av = String(a.getValue(sortPropId) ?? '');
 					const bv = String(b.getValue(sortPropId) ?? '');
-					const countStars = (s: string) => (s === '' ? -1 : [...s].filter((c) => c === '⭐').length || Number(s) || 0);
-					const an = countStars(av);
-					const bn = countStars(bv);
-					if (bn !== an) return bn - an;
+					const cmp = compareSortValuesDesc(av, bv);
+					if (cmp !== 0) return cmp;
 				}
 				return 0;
 			});
