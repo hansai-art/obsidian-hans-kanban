@@ -11,6 +11,7 @@ import {
 	installPropertySuggesterPatch,
 	installWriteTimeAutoColor,
 	registerGlobalAutoColor,
+	registerGlobalRenameSync,
 	restorePropertySuggester,
 	restoreWriteTimeAutoColor,
 	setSuggesterOptionsPersistence,
@@ -80,6 +81,12 @@ export default class KanbanBasesViewPlugin extends Plugin {
 		// background, which is exactly when the user edits a note's property.
 		const autoColorRef = registerGlobalAutoColor(this.app);
 		if (autoColorRef) this.registerEvent(autoColorRef);
+
+		// Sync renamed-file paths into all open boards' _prefs.cardOrders so a
+		// renamed card keeps its saved column position instead of falling to the
+		// end. Closed boards self-recover on next open via recoverStalePath().
+		const renameSyncRef = registerGlobalRenameSync(this.app);
+		if (renameSyncRef) this.registerEvent(renameSyncRef);
 
 		// Option lists persisted from previous sessions make the suggester patch,
 		// the write-time patch and the auto-color listener effective from app

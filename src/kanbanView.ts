@@ -38,7 +38,7 @@ import {
 	type RowRenderCtx,
 	type RowCallbacks,
 } from './components/row.ts';
-import type { TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import Sortable from 'sortablejs';
 import {
 	COLOR_NAME_TO_EMOJI,
@@ -531,6 +531,38 @@ export function isCollapsedLanes(value: unknown): value is Record<string, string
 	return isStringArrayRecord(value);
 }
 
+// Module-level registry of open KanbanView instances. The global vault.rename
+// listener (registered in main.ts) iterates this set to sync each board's
+// in-session _prefs.cardOrders when a markdown file is renamed — otherwise the
+// renamed card falls out of its saved order and gets appended to the end on
+// next render.
+const openKanbanViews = new Set<KanbanView>();
+
+/**
+ * Registers a single vault.rename listener that syncs all open KanbanView
+ * boards. Returns the EventRef for Plugin.registerEvent.
+ *
+ * Bug fixed: card path strings in _prefs.cardOrders / .base config become
+ * stale after a markdown rename. Without this sync, the renamed card falls
+ * out of its saved order and gets appended to the end of its column.
+ */
+export function registerGlobalRenameSync(app: App): EventRef | null {
+	const vault = app.vault;
+	if (!vault || typeof vault.on !== 'function') return null;
+	return vault.on('rename', (file, oldPath) => {
+		if (!(file instanceof TFile) || file.extension !== 'md') return;
+		const newPath = file.path;
+		if (oldPath === newPath) return;
+		for (const view of openKanbanViews) {
+			try {
+				view.handleRename(oldPath, newPath);
+			} catch (error) {
+				console.error('KanbanView: handleRename failed', error);
+			}
+		}
+	});
+}
+
 /** Narrow a raw config value to a BasesPropertyId ('note.x' / 'file.x' / 'formula.x'). */
 function isBasesPropertyId(value: unknown): value is BasesPropertyId {
 	return (
@@ -655,6 +687,7 @@ export class KanbanView extends BasesView {
 		this.scrollEl = scrollEl;
 		this.containerEl = scrollEl.createDiv({ cls: CSS_CLASSES.VIEW_CONTAINER });
 		this.legacyData = legacyData;
+		openKanbanViews.add(this);
 
 		// Delegated handler for internal links rendered inside property values.
 		// Obsidian's global click handler only covers MarkdownView/TextFileView
@@ -886,11 +919,28 @@ export class KanbanView extends BasesView {
 		}
 		this._prefs.columnOrder = columnOrder ? [...columnOrder] : [];
 
-		// Card orders
+		// Card orders — with stale-path recovery for files renamed while the board
+		// was closed. Without recovery, a renamed card falls out of its saved
+		// position and gets appended to the end of its column on next render.
 		const rawCardOrders = this.config?.get('cardOrders');
 		const allCardOrders = isCardOrders(rawCardOrders) ? rawCardOrders : {};
 		const savedCardOrders = allCardOrders[swimlaneScopedKey ?? propertyId] ?? {};
-		this._prefs.cardOrders = Object.fromEntries(Object.entries(savedCardOrders).map(([k, v]) => [k, [...v]]));
+		let recoveredAny = false;
+		this._prefs.cardOrders = Object.fromEntries(
+			Object.entries(savedCardOrders).map(([k, v]) => {
+				const repaired = v.map((path) => {
+					const recovered = this.recoverStalePath(path);
+					if (recovered !== path) recoveredAny = true;
+					return recovered;
+				});
+				return [k, repaired];
+			}),
+		);
+		if (recoveredAny) {
+			// Persist the corrected paths on close so the .base no longer carries
+			// the stale references (and the recovery only runs once per rename).
+			this._prefsDirty = true;
+		}
 
 		// Column colors — with legacy migration
 		const rawColors = this.config?.get('columnColors');
@@ -2636,12 +2686,66 @@ export class KanbanView extends BasesView {
 		return [...ordered, ...unsaved];
 	}
 
+	/**
+	 * If `savedPath` still exists in the vault, return it unchanged. Otherwise
+	 * try to recover from a rename that happened while this board was closed:
+	 * look in the same directory for a unique markdown file whose basename
+	 * shares the same hyphen-prefix (e.g. `C0-2-`). Returns the recovered path
+	 * if exactly one candidate matches; otherwise returns the original path.
+	 *
+	 * Conservative on purpose — silently keeps the stale path when the match
+	 * is ambiguous (so it never picks the wrong card).
+	 */
+	private recoverStalePath(savedPath: string): string {
+		const app = this.app;
+		if (!app?.vault) return savedPath;
+		if (app.vault.getAbstractFileByPath(savedPath)) return savedPath;
+		const lastSlash = savedPath.lastIndexOf('/');
+		const dir = lastSlash >= 0 ? savedPath.slice(0, lastSlash) : '';
+		const basename = savedPath.slice(lastSlash + 1).replace(/\.md$/, '');
+		const parts = basename.split('-');
+		if (parts.length < 2) return savedPath;
+		// Prefix = first two hyphen segments, e.g. "C0-2"
+		const prefix = `${parts[0]}-${parts[1]}-`;
+		const candidates: string[] = [];
+		for (const f of app.vault.getMarkdownFiles()) {
+			if (f.parent?.path !== dir) continue;
+			if (f.name.startsWith(prefix)) candidates.push(f.path);
+			if (candidates.length > 1) return savedPath; // ambiguous
+		}
+		return candidates.length === 1 ? candidates[0] : savedPath;
+	}
+
+	/**
+	 * Called from the global vault.rename listener (registerGlobalRenameSync).
+	 * Updates in-session _prefs.cardOrders so the renamed card keeps its saved
+	 * position instead of being treated as a new entry and appended to the end.
+	 *
+	 * Marks _prefs dirty so the corrected paths are flushed back to config on
+	 * close (the Bases host then persists the updated paths to the .base file).
+	 */
+	public handleRename(oldPath: string, newPath: string): void {
+		let changed = false;
+		for (const key of Object.keys(this._prefs.cardOrders)) {
+			const order = this._prefs.cardOrders[key];
+			const idx = order.indexOf(oldPath);
+			if (idx >= 0) {
+				order[idx] = newPath;
+				changed = true;
+			}
+		}
+		if (changed) {
+			this._prefsDirty = true;
+		}
+	}
+
 	onClose(): void {
 		// Tear down event paths FIRST: the flush below writes config, which can make
 		// the Bases host emit onDataUpdated / metadata events while we are closing.
 		// Mark closed (guards any already-queued debounced render), then cancel the
 		// debounce.
 		this._closed = true;
+		openKanbanViews.delete(this);
 		this._debouncedRender.cancel();
 		// NOTE: the property-suggester patch is deliberately NOT removed here —
 		// Bases closes the view whenever its tab goes background, which is when
