@@ -4666,3 +4666,69 @@ describe('Hide empty columns option', () => {
 		assert.ok(columnValues(view).includes('In Progress'), 'Column should reappear after toggling the option off');
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Rename sync (registerGlobalRenameSync / handleRename / recoverStalePath)
+// ---------------------------------------------------------------------------
+
+describe('Rename sync', () => {
+	let scrollEl: HTMLElement;
+	let controller: any;
+	let app: any;
+
+	beforeEach(() => {
+		scrollEl = createDivWithMethods();
+		app = createMockApp();
+	});
+
+	function buildView() {
+		const entries = createEntriesWithStatus();
+		controller = createMockQueryController(entries, TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = () => PROPERTY_STATUS;
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+		return view;
+	}
+
+	test('handleRename rewrites the saved path in place and marks prefs dirty', () => {
+		const view = buildView();
+		(view as any)._prefs.cardOrders = { 'To Do': ['notes/a.md', 'notes/b.md'] };
+		(view as any)._prefsDirty = false;
+		view.handleRename('notes/b.md', 'notes/b-renamed.md');
+		assert.deepStrictEqual((view as any)._prefs.cardOrders['To Do'], ['notes/a.md', 'notes/b-renamed.md']);
+		assert.strictEqual((view as any)._prefsDirty, true);
+	});
+
+	test('handleRename with an unknown path changes nothing', () => {
+		const view = buildView();
+		(view as any)._prefs.cardOrders = { 'To Do': ['notes/a.md'] };
+		(view as any)._prefsDirty = false;
+		view.handleRename('notes/zzz.md', 'notes/yyy.md');
+		assert.deepStrictEqual((view as any)._prefs.cardOrders['To Do'], ['notes/a.md']);
+		assert.strictEqual((view as any)._prefsDirty, false);
+	});
+
+	test('recoverStalePath returns existing paths unchanged', () => {
+		const view = buildView();
+		const files = app.vault.getMarkdownFiles();
+		files.push({ path: 'dir/01-Ann-PM.md', name: '01-Ann-PM.md', parent: { path: 'dir' } });
+		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM.md');
+	});
+
+	test('recoverStalePath repairs a stale path via unique hyphen-prefix match', () => {
+		const view = buildView();
+		const files = app.vault.getMarkdownFiles();
+		files.push({ path: 'dir/01-Ann-PM-lion24.md', name: '01-Ann-PM-lion24.md', parent: { path: 'dir' } });
+		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM-lion24.md');
+	});
+
+	test('recoverStalePath keeps the stale path when the prefix match is ambiguous', () => {
+		const view = buildView();
+		const files = app.vault.getMarkdownFiles();
+		files.push({ path: 'dir/01-Ann-PM-lion.md', name: '01-Ann-PM-lion.md', parent: { path: 'dir' } });
+		files.push({ path: 'dir/01-Ann-PA-crab.md', name: '01-Ann-PA-crab.md', parent: { path: 'dir' } });
+		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM.md');
+	});
+});
