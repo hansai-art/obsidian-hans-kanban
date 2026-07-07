@@ -1,7 +1,13 @@
-# Obsidian 社群商店送審稿（待 Hans 過目後送出）
+# Obsidian 社群商店送審（已送出，2026-07-07）
 
-> 狀態：草稿。GitHub Release 最新 1.3.0 已上線，三個 assets（main.js / manifest.json / styles.css）驗證可下載。
-> 送出方式：fork [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases)，把下方 JSON 加到 `community-plugins.json` 陣列**最尾端**，開 PR。
+> 狀態：**已送審**。community.obsidian.md 顯示「Your entry is live. An automated review is in progress.」（Version 1.3.1 / commit fbf1595 / Pending）。
+> 管理頁：https://community.obsidian.md/account/plugins/hans-kanban
+> 禮貌性知會 issue：https://github.com/xiwcx/obsidian-bases-kanban/issues/102
+>
+> **流程已改版（2026 現行）**：不再是 fork obsidian-releases 開 PR 改 community-plugins.json（該 repo PR 已關閉）。
+> 現行 = community.obsidian.md 登入 Obsidian 帳號 + 連結 GitHub → Plugins → New plugin → 填 repo URL → 勾兩個同意（Developer Policies + 持續維護承諾）→ Submit。
+> 之後審查回饋若要求修改：改 code 後 bump 版本發新 release，審查系統會抓最新版。
+> 下方 PR 條目 / PR body 為舊流程遺留，僅留作 fork 差異化聲明與 bot 自查清單參考。
 
 ## community-plugins.json 條目
 
