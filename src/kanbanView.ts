@@ -9,7 +9,7 @@ import type {
 	QueryController,
 	ViewOption,
 } from 'obsidian';
-import { BasesView, Keymap, Notice, normalizePath, parsePropertyId } from 'obsidian';
+import { BasesView, Keymap, Notice, Value, normalizePath, parsePropertyId } from 'obsidian';
 import { ToolbarToggleGroup } from './toolbar.ts';
 import { compareSortValuesDesc } from './utils/sortValue.ts';
 import { applyViewConfigCopy, readSiblingKanbanViews, renderOnboarding } from './onboarding.ts';
@@ -681,6 +681,9 @@ export class KanbanView extends BasesView {
 	private _masonryMode = false;
 	private _lastMasonryEntriesKey = '';
 	private _toolbarToggles: ToolbarToggleGroup | null = null;
+
+	/** The .bases-view wrapper we tagged with the host class (see _ensureBasesHostClass). */
+	private _basesHostEl: HTMLElement | null = null;
 	/** One inherit attempt per session; config marker 'inheritedFrom' persists across sessions. */
 	private _inheritAttempted = false;
 	private _debouncedFlushPrefs: DebouncedFn<() => void>;
@@ -1068,6 +1071,7 @@ export class KanbanView extends BasesView {
 
 	private render(): void {
 		try {
+			this._ensureBasesHostClass();
 			const entries = this.data?.data || [];
 			const availablePropertyIds = this.allProperties || [];
 
@@ -2116,7 +2120,10 @@ export class KanbanView extends BasesView {
 		if (parsed.type !== 'note' || !parsed.name) return;
 		const propertyName = parsed.name;
 		for (const entry of entries) {
-			const raw = entry.getValue(this.cardColorPropertyId)?.toString().trim() ?? '';
+			// unknown + explicit narrowing keeps the chain type-safe even where
+			// the Value typing can't be resolved (store review lints without it).
+			const value: unknown = entry.getValue(this.cardColorPropertyId);
+			const raw = typeof value === 'string' ? value.trim() : value instanceof Value ? value.toString().trim() : '';
 			// "null" = a truthy Value wrapper around cleared/absent data; nothing
 			// to color (and the in-note guard below would reject the write anyway).
 			if (!raw || raw === 'null') continue;
@@ -2671,6 +2678,24 @@ export class KanbanView extends BasesView {
 		// won't be torn down with the view. Remove it explicitly to avoid orphans.
 		this._toolbarToggles?.destroy();
 		this._toolbarToggles = null;
+		// The host class lives on Obsidian's wrapper (outside our container) and
+		// must not leak into the next view type shown in the same wrapper.
+		this._basesHostEl?.classList.remove(CSS_CLASSES.BASES_HOST);
+		this._basesHostEl = null;
+	}
+
+	/**
+	 * Tag the Bases wrapper hosting this view with a class, replacing a CSS
+	 * `:has(> .obk-view-container)` selector (flagged by store review for its
+	 * invalidation cost). The class makes the wrapper fill its leaf; see
+	 * styles.css `.bases-view.obk-bases-host`.
+	 */
+	private _ensureBasesHostClass(): void {
+		const host = this.containerEl.closest('.bases-view');
+		if (!host?.instanceOf(HTMLElement) || host === this._basesHostEl) return;
+		this._basesHostEl?.classList.remove(CSS_CLASSES.BASES_HOST);
+		this._basesHostEl = host;
+		host.classList.add(CSS_CLASSES.BASES_HOST);
 	}
 
 	/**

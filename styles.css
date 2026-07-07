@@ -1,8 +1,10 @@
 /* Custom Bases views don't inherit the full-height fill that native table/card
    views get, so the Bases wrapper collapses to content height and leaves an
    empty band (background-primary) below the board. Make the wrapper hosting our
-   view fill its leaf so the board reaches the bottom. */
-.bases-view:has(> .obk-view-container) {
+   view fill its leaf so the board reaches the bottom. The .obk-bases-host class
+   is added/removed by the view itself (see _ensureBasesHostClass) instead of a
+   :has() selector, which store review flags for invalidation cost. */
+.bases-view.obk-bases-host {
 	flex: 1 1 auto;
 	min-height: 0;
 	height: 100%;
@@ -125,7 +127,10 @@
 	display: none;
 }
 
-/* Masonry board: CSS multi-column card gallery. */
+/* Masonry board: CSS multi-column card gallery. Store review warns that
+   multi-column is "partially supported" against its 1.9.x baseline; this
+   plugin's minAppVersion is 1.10.2 (Bases requirement) and the layout is
+   verified in Obsidian's bundled Chromium, so the warning does not apply. */
 .obk-masonry-board {
 	column-count: var(--obk-masonry-columns, 4);
 	column-gap: 8px;
@@ -722,11 +727,12 @@
 
 /* pre-wrap so newline-joined bullet strings (•\n•\n•) render as a real
    multi-line list natively — no user CSS snippet required. The rendered
-   markdown child can set its own white-space, so target it too and use
-   !important to win against Obsidian's markdown-rendered defaults. */
-.obk-card-property-wrap .obk-card-property-value,
-.obk-card-property-wrap .obk-card-property-value > * {
-	white-space: pre-wrap !important;
+   markdown child can set its own white-space, so target it too; the extra
+   .obk-view-container ancestor raises specificity above Obsidian's
+   markdown-rendered defaults without resorting to !important. */
+.obk-view-container .obk-card-property-wrap .obk-card-property-value,
+.obk-view-container .obk-card-property-wrap .obk-card-property-value > * {
+	white-space: pre-wrap;
 }
 
 .obk-card-property-label {

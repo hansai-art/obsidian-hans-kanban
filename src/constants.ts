@@ -134,6 +134,8 @@ export const SWIMLANE_KEY_SEPARATOR = '\u001F';
 /** CSS class names */
 export const CSS_CLASSES = {
 	// Container
+	/** Applied to Obsidian's .bases-view wrapper while it hosts this view. */
+	BASES_HOST: 'obk-bases-host',
 	VIEW_CONTAINER: 'obk-view-container',
 	VIEW_CONTAINER_WITH_SWIMLANES: 'obk-view-container--with-swimlanes',
 	BOARD: 'obk-board',
