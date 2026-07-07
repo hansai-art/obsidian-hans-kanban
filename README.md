@@ -6,6 +6,20 @@
 
 > **這是 fork 版本**：Hans Kanban 改自 [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban)（作者 I. Welch Canavan，MIT 授權），加上繁體中文介面、卡片依狀態上色與切換、可調欄寬、極簡模式等功能。原作者版權保留於 [LICENSE](LICENSE)。
 
+## 與原版 Kanban Bases View 的差異
+
+原版提供 Bases 的基本看板視圖，Hans Kanban 在其上加了：
+
+- 繁體中文介面（依 Obsidian 語言自動切換，其他語言顯示英文）
+- 整卡依屬性值上色，加上固定選項清單管理（改名 / 換色 / 刪除，附使用數統計）
+- 卡片上直接切換狀態的下拉選單，變更即時重新上色
+- 泳道（swimlane）雙軸分組
+- 瀑布（masonry）卡片牆模式，依顏色順序 + 排序欄位自動排序
+- 欄寬調整：全域滑桿 + 單欄拖拉（雙擊還原）
+- 極簡模式（隱藏屬性標籤）與「隱藏空欄位」選項
+- 檔案改名後卡片保留原位置（rename 同步）
+- 快速新增卡片與範例看板產生器
+
 ---
 
 ## 新手教學：從零開始（跟著做就會）
@@ -111,6 +125,20 @@
 Turn your Obsidian notes into a kanban board: cards in columns you can drag between to update progress. Great for tracking video production, to-dos, writing, or anything with stages.
 
 > **This is a fork** of [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan (MIT), adding a Traditional Chinese UI, status-based card colors and switching, adjustable column widths, and a minimal mode. Original copyright is kept in [LICENSE](LICENSE).
+
+### How this differs from the original
+
+The original provides the base kanban view for Bases. Hans Kanban adds:
+
+- Traditional Chinese UI (auto-detected from the Obsidian language; everything else falls back to English)
+- Whole-card coloring by property value, with a managed option list (rename / recolor / delete, with usage counts)
+- An on-card dropdown that switches status and recolors instantly
+- Swimlanes (two-axis grouping)
+- A masonry card-wall mode, auto-sorted by color order plus a sort property
+- Column widths: a global slider plus per-column drag (double-click to reset)
+- Minimal mode (hide property labels) and a hide-empty-columns option
+- Renamed files keep their card position (rename sync)
+- Quick-add cards and a demo-board generator
 
 ### Quick start (beginner friendly)
 
