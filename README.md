@@ -4,6 +4,10 @@
 
 把 Obsidian 的筆記變成一塊「看板」：像便利貼一樣分欄排列，拖一拖就能更新進度。適合管理影片製作、待辦事項、寫作進度、任何「有不同階段」的工作。
 
+![範例看板：欄位依分類上色、卡片依狀態上色、卡上直接切換狀態](docs/assets/demo-board.jpg)
+
+上圖就是內建的範例看板（指令面板 →「建立範例看板」一鍵生成）：欄位依分類上色、卡片依狀態上色、卡片上的下拉選單可直接切換狀態。
+
 > **這是 fork 版本**：Hans Kanban 改自 [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban)（作者 I. Welch Canavan，MIT 授權），加上繁體中文介面、卡片依狀態上色與切換、可調欄寬、極簡模式等功能。原作者版權保留於 [LICENSE](LICENSE)。
 
 ## 與原版 Kanban Bases View 的差異
@@ -124,6 +128,10 @@
 ## English
 
 Turn your Obsidian notes into a kanban board: cards in columns you can drag between to update progress. Great for tracking video production, to-dos, writing, or anything with stages.
+
+![The built-in demo board: columns colored by category, cards colored by status, on-card status switching](docs/assets/demo-board.jpg)
+
+The screenshot above is the built-in demo board (command palette → "Create demo board"): columns colored by category, cards colored by status, and a dropdown on each card to switch status in place.
 
 > **This is a fork** of [Kanban Bases View](https://github.com/xiwcx/obsidian-bases-kanban) by I. Welch Canavan (MIT), adding a Traditional Chinese UI, status-based card colors and switching, adjustable column widths, and a minimal mode. Original copyright is kept in [LICENSE](LICENSE).
 
