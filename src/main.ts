@@ -1,6 +1,6 @@
 import { Plugin } from 'obsidian';
 import { HOVER_LINK_SOURCE_ID } from './constants.ts';
-import { createDemoBoard, DemoPromptModal } from './demo.ts';
+import { createDemoBoard, DemoPromptModal, removeDemoBoard } from './demo.ts';
 import { t } from './i18n/index.ts';
 import {
 	KanbanView,
@@ -105,6 +105,16 @@ export default class KanbanBasesViewPlugin extends Plugin {
 			name: t('command.createDemo'),
 			callback: () => {
 				void createDemoBoard(this.app);
+			},
+		});
+
+		// Counterpart cleanup: trash the demo folder once the user is done with
+		// it. Only flagged demo files are removed; user files survive.
+		this.addCommand({
+			id: 'remove-demo-board',
+			name: t('command.removeDemo'),
+			callback: () => {
+				void removeDemoBoard(this.app);
 			},
 		});
 

@@ -57,6 +57,7 @@ export const en = {
 	'quickAdd.folderNotFound': 'Quick add folder not found:',
 
 	'command.createDemo': 'Create demo board',
+	'command.removeDemo': 'Remove demo board',
 	'command.recolor': 'Manage status options (rename / recolor / delete)',
 	'recolor.pickValue': 'Manage status options',
 	'recolor.pickEmoji': 'Pick a new color / icon for',
@@ -81,6 +82,10 @@ export const en = {
 	'demo.created': 'Demo board created. Drag a card or switch its status to see it work.',
 	'demo.exists': 'The demo board already exists, so I opened it for you.',
 	'demo.failed': 'Could not create the demo board.',
+	'demo.removed': 'Demo board removed. The files went to your trash.',
+	'demo.removedPartial': 'Demo files removed. The folder was kept because it still contains files of your own.',
+	'demo.removeMissing': 'No demo board found: nothing to remove.',
+	'demo.removeFailed': 'Could not remove the demo board.',
 } as const;
 
 export type StringKey = keyof typeof en;

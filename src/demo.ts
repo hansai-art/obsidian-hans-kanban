@@ -1,4 +1,4 @@
-import { type App, Modal, Notice, TFile, normalizePath } from 'obsidian';
+import { type App, Modal, Notice, TFile, TFolder, normalizePath } from 'obsidian';
 import { t } from './i18n/index.ts';
 
 /**
@@ -31,6 +31,8 @@ interface DemoNote {
 	file: string;
 	area: string;
 	status: string;
+	/** ⭐ rating; the 瀑布 Flow view sorts by it so the sort is visible. */
+	stars: string;
 	outline: string[];
 	body: string;
 }
@@ -40,13 +42,19 @@ const DEMO_NOTES: DemoNote[] = [
 		file: '01 歡迎 Welcome.md',
 		area: PLAN,
 		status: TODO,
-		outline: ['Columns are colored by category', 'Drag a card between columns'],
+		stars: '⭐⭐⭐',
+		outline: [
+			'Columns are colored by category',
+			'Drag a card between columns',
+			'Switch views (top left): 範例看板 Demo ↔ 瀑布 Flow',
+		],
 		body: '這是一塊範例看板。This is a sample board: drag the cards around and watch what happens.',
 	},
 	{
 		file: '02 一張卡片 A card.md',
 		area: PLAN,
 		status: DOING,
+		stars: '⭐',
 		outline: ['A card is just a note', 'Click a card to open the note'],
 		body: '每張卡片背後都是一則普通的 Markdown 筆記。Each card is an ordinary note.',
 	},
@@ -54,6 +62,7 @@ const DEMO_NOTES: DemoNote[] = [
 		file: '03 切換狀態 Switch status.md',
 		area: BUILD,
 		status: DOING,
+		stars: '⭐⭐⭐',
 		outline: ['Use the dropdown on the card to switch status', 'The card recolors instantly'],
 		body: '看到卡片上的下拉選單了嗎?點它就能換狀態。Use the dropdown on this card to switch status.',
 	},
@@ -61,6 +70,7 @@ const DEMO_NOTES: DemoNote[] = [
 		file: '04 依狀態上色 Color by status.md',
 		area: BUILD,
 		status: DOING,
+		stars: '⭐⭐',
 		outline: ['Card color follows the status value', '🔴 To Do, 🟡 In Progress, 🟢 Done'],
 		body: '卡片顏色跟著「狀態」走。A card is colored by its status value.',
 	},
@@ -68,6 +78,7 @@ const DEMO_NOTES: DemoNote[] = [
 		file: '05 欄寬與極簡 Width & minimal.md',
 		area: LAUNCH,
 		status: DONE,
+		stars: '⭐',
 		outline: ['Drag a column edge to resize it', 'The Minimal toggle hides labels'],
 		body: '試試拖欄位右邊界,或按工具列上的「極簡」。Try resizing a column or the Minimal toggle.',
 	},
@@ -75,18 +86,29 @@ const DEMO_NOTES: DemoNote[] = [
 		file: '06 用自己的筆記 Your own notes.md',
 		area: LAUNCH,
 		status: DONE,
+		stars: '⭐⭐',
 		outline: ['Add a category and a status to your notes', 'Group by your category, color by status'],
 		body: '準備好了嗎?換成你自己的筆記吧。Ready? Point it at your own notes next.',
 	},
+	{
+		file: '07 看完就刪 Delete this demo.md',
+		area: LAUNCH,
+		status: DONE,
+		stars: '⭐⭐⭐',
+		outline: ['Command palette → "Remove demo board"', 'Your own notes are never touched'],
+		body:
+			'看完了嗎?打開指令面板,執行「移除範例看板」就能一鍵清掉整個範例。Done exploring? Run "Remove demo board" from the command palette to clean this whole demo up.',
+	},
 ];
 
-/** Build a note with frontmatter (demo flag + area + status + outline) and a body. */
+/** Build a note with frontmatter (demo flag + area + status + stars + outline) and a body. */
 function noteContent(note: DemoNote): string {
 	const outline = note.outline.map((line) => `  - ${JSON.stringify(line)}`).join('\n');
 	return `---
 hans_kanban_demo: true
 area: ${JSON.stringify(note.area)}
 status: ${JSON.stringify(note.status)}
+stars: ${JSON.stringify(note.stars)}
 outline:
 ${outline}
 ---
@@ -99,7 +121,9 @@ ${note.body}
 
 // Pre-wired board mirroring a real setup: columns grouped by `area`, each with
 // its own backplate color (columnColors); cards colored by `status` with the
-// on-card switcher; labels hidden (minimal mode); outline wrapped.
+// on-card switcher; labels hidden (minimal mode); outline wrapped. A second
+// masonry view over the same notes teaches the view switcher (top left) and
+// shows the color-order + star sorting: switching views is config, not data.
 const BASE_CONTENT = `filters:
   and:
     - note.hans_kanban_demo == true
@@ -108,6 +132,8 @@ properties:
     displayName: 分類 Area
   note.status:
     displayName: 狀態 Status
+  note.stars:
+    displayName: 重要度 Stars
   note.outline:
     displayName: 重點 Key points
 views:
@@ -134,6 +160,22 @@ views:
         ${PLAN}: red
         ${BUILD}: orange
         ${LAUNCH}: blue
+  - type: hans-kanban-view
+    name: 瀑布 Flow
+    order:
+      - stars
+      - outline
+    groupByProperty: note.area
+    cardColorProperty: note.status
+    cardColorOrder:
+      - ${TODO}
+      - ${DOING}
+      - ${DONE}
+    wrapPropertyValues: true
+    minimalMode: true
+    masonryMode: true
+    masonryColumns: 3
+    masonrySortProperty: note.stars
 `;
 
 /**
@@ -168,6 +210,50 @@ export async function createDemoBoard(app: App): Promise<void> {
 	} catch (error) {
 		console.error('[hans-kanban] demo board creation failed', error);
 		new Notice(t('demo.failed'));
+	}
+}
+
+/** Demo notes carry this frontmatter line verbatim (see noteContent). */
+const DEMO_FLAG_LINE = /^hans_kanban_demo: true$/m;
+
+/**
+ * One-click cleanup, the counterpart of createDemoBoard. Trashes (respecting
+ * the user's "deleted files" setting) every flagged demo note and every .base
+ * inside the demo folder, then the folder itself — but only if it is empty by
+ * then. Anything the user added to the folder (no demo flag, subfolders) is
+ * kept, and the Notice says so.
+ */
+export async function removeDemoBoard(app: App): Promise<void> {
+	const folder = app.vault.getFolderByPath(normalizePath(DEMO_FOLDER));
+	if (!(folder instanceof TFolder)) {
+		new Notice(t('demo.removeMissing'));
+		return;
+	}
+	try {
+		let kept = 0;
+		// Copy: trashing a child mutates folder.children under the loop.
+		for (const child of [...folder.children]) {
+			if (!(child instanceof TFile)) {
+				kept++;
+				continue;
+			}
+			const isDemo =
+				child.extension === 'base' || (child.extension === 'md' && DEMO_FLAG_LINE.test(await app.vault.read(child)));
+			if (isDemo) {
+				await app.fileManager.trashFile(child);
+			} else {
+				kept++;
+			}
+		}
+		if (kept === 0) {
+			await app.fileManager.trashFile(folder);
+			new Notice(t('demo.removed'));
+		} else {
+			new Notice(t('demo.removedPartial'));
+		}
+	} catch (error) {
+		console.error('[hans-kanban] demo board removal failed', error);
+		new Notice(t('demo.removeFailed'));
 	}
 }
 

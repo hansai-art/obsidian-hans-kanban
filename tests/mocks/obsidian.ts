@@ -4,18 +4,32 @@
 export type BasesPropertyId = string;
 export type ViewOption = any;
 
-export interface TFile {
-	path: string;
-	name: string;
-	basename: string;
-	extension: string;
+// Real classes: TAbstractFile → TFile / TFolder. Classes (not interfaces) so
+// production `instanceof TFile` checks work under test; object literals cast
+// `as TFile` remain valid structurally. Fields are assigned via Object.assign
+// in helpers, so they are declared with defaults here.
+export class TAbstractFile {
+	path = '';
+	name = '';
+	vault: any = null;
+	parent: any = null;
+}
+
+export class TFile extends TAbstractFile {
+	basename = '';
+	extension = '';
 	stat: {
 		size: number;
 		ctime: number;
 		mtime: number;
-	};
-	vault: any;
-	parent: any;
+	} = { size: 0, ctime: 0, mtime: 0 };
+}
+
+export class TFolder extends TAbstractFile {
+	children: TAbstractFile[] = [];
+	isRoot(): boolean {
+		return false;
+	}
 }
 
 export interface BasesEntry {
@@ -54,12 +68,14 @@ export interface App {
 	fileManager: {
 		processFrontMatter(file: TFile, fn: (frontmatter: any) => void | Promise<void>): Promise<void>;
 		renameFile(file: TFile, newPath: string): Promise<void>;
+		trashFile?(file: TAbstractFile): Promise<void>;
 	};
 	vault: {
 		getMarkdownFiles(): TFile[];
-		getFolderByPath(path: string): { path: string; name: string } | null;
+		getFolderByPath(path: string): TFolder | { path: string; name: string } | null;
 		getAbstractFileByPath(path: string): TFile | null;
 		getResourcePath(file: { path: string }): string;
+		read?(file: TFile): Promise<string>;
 	};
 	renderContext: RenderContext;
 }

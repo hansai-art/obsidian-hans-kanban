@@ -58,6 +58,7 @@ export const zhTW: Record<StringKey, string> = {
 	'quickAdd.folderNotFound': '找不到快速新增資料夾：',
 
 	'command.createDemo': '建立範例看板',
+	'command.removeDemo': '移除範例看板',
 	'command.recolor': '管理狀態選項（改名 / 換色 / 刪除）',
 	'recolor.pickValue': '管理狀態選項',
 	'recolor.pickEmoji': '選擇新的顏色 / 圖示：',
@@ -82,4 +83,8 @@ export const zhTW: Record<StringKey, string> = {
 	'demo.created': '範例看板已建立，拖一張卡片或切換它的狀態試試看。',
 	'demo.exists': '範例看板已經存在，已經幫你開啟。',
 	'demo.failed': '無法建立範例看板。',
+	'demo.removed': '範例看板已移除，檔案已進垃圾桶。',
+	'demo.removedPartial': '範例檔案已移除。資料夾裡還有你自己的檔案，所以保留了資料夾。',
+	'demo.removeMissing': '找不到範例看板，沒有東西可以移除。',
+	'demo.removeFailed': '無法移除範例看板。',
 };

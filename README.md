@@ -116,7 +116,7 @@
 - **整欄換色**：點欄位標題旁的小圓點可以指定該欄顏色，整欄（外框＋底色）都會跟著變。
 - **調整欄寬**：用滑桿一次調整全部欄寬，或拖某一欄的右邊界單獨調整（雙擊還原）。
 - **極簡模式**：工具列上的「極簡」鈕，一鍵把卡片上的屬性標籤藏起來，畫面更清爽。
-- **範例看板**：指令面板輸入「建立範例看板」，一鍵生出一塊可以玩的示範看板，不會動到你既有的筆記。
+- **範例看板**：指令面板輸入「建立範例看板」，一鍵生出一塊可以玩的示範看板（含看板、瀑布兩種視圖，教你左上角切換），不會動到你既有的筆記。看完輸入「移除範例看板」一鍵清掉，只刪範例檔，你自己的檔案不會動。
 - **新視圖不會壞**：新增視圖會自動沿用現有看板的設定；還沒設定的視圖會顯示引導卡（複製設定 / 選分欄欄位 / 建範例），分欄欄位打錯也只會出提示條，版面不會壞。
 
 ---
@@ -190,7 +190,7 @@ Renames and recolors also sync to the property suggester and, if you use the Met
 - **Whole-column color**: pick a color from the dot next to a column title; the outline and body tint to match.
 - **Column width**: a global slider, plus a per-column drag handle (double-click to reset).
 - **Minimal mode**: a toolbar toggle hides per-card property labels for a cleaner board.
-- **Demo board**: command palette → "Create demo board" builds a playground board without touching your notes.
+- **Demo board**: command palette → "Create demo board" builds a playground board (with both a kanban and a masonry flow view, so you learn the view switcher) without touching your notes. Done exploring? "Remove demo board" cleans it all up and never touches your own files.
 - **Views that don't break**: a new view auto-inherits the settings of your configured board; unconfigured views show a guided setup card, and a bad group-by property only shows a warning banner.
 
 ## Development
