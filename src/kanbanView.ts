@@ -12,6 +12,7 @@ import type {
 import { BasesView, Keymap, Notice, normalizePath, parsePropertyId } from 'obsidian';
 import { ToolbarToggleGroup } from './toolbar.ts';
 import { compareSortValuesDesc } from './utils/sortValue.ts';
+import { applyViewConfigCopy, readSiblingKanbanViews, renderOnboarding } from './onboarding.ts';
 import {
 	createCard as createCardEl,
 	computeCardFingerprint,
@@ -680,6 +681,8 @@ export class KanbanView extends BasesView {
 	private _masonryMode = false;
 	private _lastMasonryEntriesKey = '';
 	private _toolbarToggles: ToolbarToggleGroup | null = null;
+	/** One inherit attempt per session; config marker 'inheritedFrom' persists across sessions. */
+	private _inheritAttempted = false;
 	private _debouncedFlushPrefs: DebouncedFn<() => void>;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, legacyData: LegacyData | null = null) {
@@ -1064,16 +1067,26 @@ export class KanbanView extends BasesView {
 			const entries = this.data?.data || [];
 			const availablePropertyIds = this.allProperties || [];
 
-			if (!this.groupByPropertyId && availablePropertyIds.length === 0) {
-				this.fullReset();
-				this.containerEl.createDiv({
-					text: EMPTY_STATE_MESSAGES.NO_PROPERTIES,
-					cls: CSS_CLASSES.EMPTY_STATE,
-				});
-				return;
-			}
+			this._maybeInheritSiblingConfig();
+
 			if (!this.groupByPropertyId) {
-				this.groupByPropertyId = availablePropertyIds[0];
+				if (this._masonryMode && availablePropertyIds.length > 0) {
+					// Masonry ignores columns; any property works as the internal
+					// grouping axis for prefs.
+					this.groupByPropertyId = availablePropertyIds[0];
+				} else {
+					// Unconfigured view: guide the user instead of the confusing
+					// one-column-per-file fallback.
+					this.fullReset();
+					renderOnboarding(this.containerEl, {
+						app: this.app,
+						config: this.config,
+						allProperties: availablePropertyIds,
+						getDisplayName: (id) => this.config?.getDisplayName(id) ?? id,
+					});
+					this._ensureToolbarToggles();
+					return;
+				}
 			}
 			// If groupByPropertyId is set but is no longer in availablePropertyIds
 			// (e.g. all notes with that property were removed), keep the configured
@@ -1153,6 +1166,7 @@ export class KanbanView extends BasesView {
 					this._lastMasonryEntriesKey = entriesKey;
 					this._renderMasonry(entries);
 				}
+				this._ensureConfigWarning(false);
 				this._applyMinimalMode();
 				this._ensureToolbarToggles();
 				return;
@@ -1306,6 +1320,9 @@ export class KanbanView extends BasesView {
 				this.patchBoard(valuesToRender, lanes, hasSwimlanes);
 			}
 			this.reapplyActiveCard();
+			this._ensureConfigWarning(
+				entries.length > 0 && this.groupByPropertyId !== null && !availablePropertyIds.includes(this.groupByPropertyId),
+			);
 			this._applyMinimalMode();
 			this._ensureToolbarToggles();
 		} catch (error) {
@@ -1882,6 +1899,56 @@ export class KanbanView extends BasesView {
 		for (const entry of sorted) {
 			boardEl.appendChild(createCardEl(entry, ctx, callbacks));
 		}
+	}
+
+	/**
+	 * New-view template experience: a freshly created view (no group-by, no
+	 * card options at all) silently inherits the settings of the first
+	 * configured kanban view in the same base, so "+ add view" produces a
+	 * working board instead of a blank one. Runs at most once per session;
+	 * the persisted 'inheritedFrom' marker stops later sessions from
+	 * re-inheriting after the user clears settings on purpose.
+	 */
+	private _maybeInheritSiblingConfig(): void {
+		if (this._inheritAttempted) return;
+		const fresh =
+			!this.groupByPropertyId &&
+			!this.cardTitlePropertyId &&
+			!this.cardColorPropertyId &&
+			!this.imagePropertyId &&
+			!this._masonryMode &&
+			this.config.get('inheritedFrom') == null;
+		if (!fresh) return;
+		this._inheritAttempted = true;
+		void readSiblingKanbanViews(this.app, this.config.name).then((siblings) => {
+			if (this._closed || siblings.length === 0) return;
+			const sibling = siblings[0];
+			applyViewConfigCopy(this.config, sibling);
+			this.config.set('inheritedFrom', sibling.name);
+			new Notice(t('notice.inherited').replace('{name}', sibling.name));
+		});
+	}
+
+	/**
+	 * Non-blocking banner when the configured group-by property has no values
+	 * in the current data (typo, or every note lost the property). The board
+	 * still renders from persisted prefs — see the note in render().
+	 */
+	private _ensureConfigWarning(show: boolean): void {
+		const existing = this.containerEl.querySelector(`.${CSS_CLASSES.CONFIG_WARNING}`);
+		if (!show) {
+			existing?.remove();
+			return;
+		}
+		const propertyId = this.groupByPropertyId;
+		const display = propertyId ? (this.config?.getDisplayName(propertyId) ?? propertyId) : '';
+		const text = t('warning.groupByMissing').replace('{name}', display);
+		if (existing) {
+			existing.textContent = text;
+			return;
+		}
+		const banner = this.containerEl.createDiv({ cls: CSS_CLASSES.CONFIG_WARNING, text });
+		this.containerEl.insertBefore(banner, this.containerEl.firstChild);
 	}
 
 	/**

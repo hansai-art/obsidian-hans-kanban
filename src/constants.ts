@@ -207,6 +207,13 @@ export const CSS_CLASSES = {
 	TOOLBAR_TOGGLES: 'obk-toolbar-toggles',
 	TOOLBAR_TOGGLES_FLOATING: 'obk-toolbar-toggles--floating',
 
+	// Onboarding empty state (unconfigured view) + config warnings.
+	ONBOARDING: 'obk-onboarding',
+	ONBOARDING_TITLE: 'obk-onboarding-title',
+	ONBOARDING_DESC: 'obk-onboarding-desc',
+	ONBOARDING_ACTIONS: 'obk-onboarding-actions',
+	CONFIG_WARNING: 'obk-config-warning',
+
 	// Minimal (zen) mode: hide property labels.
 	MINIMAL: 'obk-minimal',
 	MINIMAL_TOGGLE: 'obk-minimal-toggle',

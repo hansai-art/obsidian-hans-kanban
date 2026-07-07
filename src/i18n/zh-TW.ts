@@ -24,6 +24,17 @@ export const zhTW: Record<StringKey, string> = {
 	'option.hideEmptyColumns': '隱藏空欄位',
 	'option.masonryColumns': '瀑布欄數',
 
+	'onboarding.title': '這個視圖還沒設定',
+	'onboarding.desc': '選擇卡片的分欄依據、複製現有視圖的設定，或先玩範例看板。之後都能在檢視設定裡修改。',
+	'onboarding.copyView': '複製其他視圖的設定',
+	'onboarding.copyView.none': '這個 Base 裡找不到已設定好的看板視圖。',
+	'onboarding.pickProperty': '選擇分欄欄位',
+	'onboarding.pickProperty.placeholder': '要用哪個欄位分欄…',
+	'onboarding.demo': '建立範例看板',
+	'notice.copiedView': '已複製「{name}」的設定。',
+	'notice.inherited': '新視圖已沿用「{name}」的設定，可在檢視設定修改。',
+	'warning.groupByMissing': '分欄欄位「{name}」在目前資料中沒有任何值。',
+
 	'label.uncategorized': '未分類',
 	'label.masonryMode': '瀑布模式（流動格）',
 	'label.masonryShort': '瀑布',

@@ -22,6 +22,18 @@ export const en = {
 	'option.hideEmptyColumns': 'Hide empty columns',
 	'option.masonryColumns': 'Flow columns',
 
+	'onboarding.title': 'This view is not set up yet',
+	'onboarding.desc':
+		'Pick how cards should be grouped into columns, copy the settings of an existing view, or try the demo board. You can change everything later in the view settings.',
+	'onboarding.copyView': 'Copy settings from another view',
+	'onboarding.copyView.none': 'No configured kanban view found in this base.',
+	'onboarding.pickProperty': 'Choose a group-by property',
+	'onboarding.pickProperty.placeholder': 'Property to group columns by…',
+	'onboarding.demo': 'Create a demo board',
+	'notice.copiedView': 'Copied settings from "{name}".',
+	'notice.inherited': 'New view inherited the settings of "{name}". Adjust them in the view settings.',
+	'warning.groupByMissing': 'The group-by property "{name}" has no values in the current data.',
+
 	'label.uncategorized': 'Uncategorized',
 	'label.noColor': 'No color',
 	'label.pickColor': 'Pick color',

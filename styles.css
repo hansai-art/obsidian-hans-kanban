@@ -75,6 +75,51 @@
 	--icon-size: var(--icon-xs);
 }
 
+/* Onboarding empty state: shown instead of the board when the view has no
+   group-by property configured yet. */
+.obk-onboarding {
+	max-width: 30em;
+	margin: 15vh auto 0;
+	padding: var(--size-4-6);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-l);
+	background: var(--background-secondary);
+	text-align: center;
+}
+
+.obk-onboarding-title {
+	font-size: var(--font-ui-large);
+	font-weight: var(--font-semibold);
+	margin-bottom: var(--size-4-2);
+}
+
+.obk-onboarding-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-bottom: var(--size-4-4);
+}
+
+.obk-onboarding-actions {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+}
+
+.obk-onboarding-actions button {
+	cursor: pointer;
+}
+
+/* Non-blocking config warning banner (e.g. group-by property has no values). */
+.obk-config-warning {
+	margin: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-s);
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-modifier-error-hover, var(--background-secondary));
+	color: var(--text-warning, var(--text-muted));
+	font-size: var(--font-ui-small);
+}
+
 /* Minimal mode: hide the property labels (階段 / 重點 …); keep the values. */
 .obk-minimal .obk-card-property-label {
 	display: none;

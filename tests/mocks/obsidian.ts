@@ -423,3 +423,52 @@ export function parsePropertyId(propertyId: BasesPropertyId): { name: string; ty
 		type: 'note',
 	};
 }
+
+export class FuzzySuggestModal<T> {
+	app: unknown;
+	placeholder = '';
+	opened = false;
+	constructor(app: unknown) {
+		this.app = app;
+	}
+	setPlaceholder(text: string): void {
+		this.placeholder = text;
+	}
+	open(): void {
+		this.opened = true;
+	}
+	close(): void {
+		this.opened = false;
+	}
+}
+
+export class Menu {
+	items: { title: string; click: (() => void) | null }[] = [];
+	shown = false;
+	addItem(cb: (item: unknown) => unknown): this {
+		const entry: { title: string; click: (() => void) | null } = { title: '', click: null };
+		const item = {
+			setTitle: (title: string) => {
+				entry.title = title;
+				return item;
+			},
+			onClick: (fn: () => void) => {
+				entry.click = fn;
+				return item;
+			},
+		};
+		cb(item);
+		this.items.push(entry);
+		return this;
+	}
+	showAtMouseEvent(_e: unknown): this {
+		this.shown = true;
+		return this;
+	}
+}
+
+// Test stand-in: production code uses Obsidian's real YAML parser; tests feed
+// JSON (valid YAML subset) through vault.read, so JSON.parse is sufficient.
+export function parseYaml(yaml: string): unknown {
+	return JSON.parse(yaml);
+}

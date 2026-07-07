@@ -143,6 +143,9 @@ describe('Data Rendering - Empty States', () => {
 	});
 
 	test('Renders empty state when no entries', () => {
+		// A configured group-by is required: an unconfigured view now shows the
+		// onboarding card instead of the empty state.
+		controller.config.getAsPropertyId = () => PROPERTY_STATUS;
 		const view = new KanbanView(controller, scrollEl);
 		setupKanbanViewWithApp(view, app);
 		triggerDataUpdate(view);
@@ -4730,5 +4733,108 @@ describe('Rename sync', () => {
 		files.push({ path: 'dir/01-Ann-PM-lion.md', name: '01-Ann-PM-lion.md', parent: { path: 'dir' } });
 		files.push({ path: 'dir/01-Ann-PA-crab.md', name: '01-Ann-PA-crab.md', parent: { path: 'dir' } });
 		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM.md');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Foolproofing: onboarding card, auto-inherit, config warning banner
+// ---------------------------------------------------------------------------
+
+describe('Unconfigured view foolproofing', () => {
+	let scrollEl: HTMLElement;
+	let controller: any;
+	let app: any;
+
+	beforeEach(() => {
+		scrollEl = createDivWithMethods();
+		app = createMockApp();
+		app.workspace.getActiveFile = (): null => null; // default: no sibling source
+	});
+
+	test('Unconfigured kanban view shows the onboarding card, not columns', () => {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		assert.ok(view.containerEl.querySelector('.obk-onboarding'), 'Onboarding card should render');
+		assert.strictEqual(view.containerEl.querySelectorAll('.obk-column').length, 0, 'No fallback columns');
+	});
+
+	test('Unconfigured masonry view still renders the card wall', () => {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.set('masonryMode', true);
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		assert.strictEqual(view.containerEl.querySelector('.obk-onboarding'), null);
+		assert.ok(view.containerEl.querySelector('.obk-masonry-board'), 'Masonry board should render');
+	});
+
+	test('Fresh view auto-inherits the first configured sibling view', async () => {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		app.workspace.getActiveFile = () => ({ extension: 'base', path: 'board.base' });
+		app.vault.read = async () =>
+			JSON.stringify({
+				views: [
+					{
+						type: 'hans-kanban-view',
+						name: '決策看板',
+						groupByProperty: PROPERTY_STATUS,
+						cardTitleProperty: 'note.姓名',
+					},
+				],
+			});
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		assert.strictEqual(controller.config.get('groupByProperty'), PROPERTY_STATUS);
+		assert.strictEqual(controller.config.get('cardTitleProperty'), 'note.姓名');
+		assert.strictEqual(controller.config.get('inheritedFrom'), '決策看板');
+	});
+
+	test('View marked inheritedFrom never re-inherits', async () => {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.set('inheritedFrom', '決策看板');
+		app.workspace.getActiveFile = () => ({ extension: 'base', path: 'board.base' });
+		app.vault.read = async () =>
+			JSON.stringify({
+				views: [{ type: 'hans-kanban-view', name: '決策看板', groupByProperty: PROPERTY_STATUS }],
+			});
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		assert.strictEqual(controller.config.get('groupByProperty'), null, 'Cleared settings must stay cleared');
+	});
+
+	test('Banner appears when the group-by property has no values in the data', () => {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = () => 'note.打錯的欄位';
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		assert.ok(view.containerEl.querySelector('.obk-config-warning'), 'Warning banner should render');
+	});
+
+	test('No banner when the group-by property exists in the data', () => {
+		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = () => PROPERTY_STATUS;
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		assert.strictEqual(view.containerEl.querySelector('.obk-config-warning'), null);
 	});
 });
