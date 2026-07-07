@@ -681,6 +681,7 @@ export class KanbanView extends BasesView {
 	private _masonryRetryScheduled = false;
 	private _lastMasonryEntriesKey = '';
 	private _toolbarObserver: MutationObserver | null = null;
+	private _debouncedFlushPrefs: DebouncedFn<() => void>;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, legacyData: LegacyData | null = null) {
 		super(controller);
@@ -738,6 +739,10 @@ export class KanbanView extends BasesView {
 				console.error('KanbanView error:', error);
 			}
 		}, DEBOUNCE_DELAY);
+		this._debouncedFlushPrefs = debounce(() => {
+			if (this._closed) return;
+			this._flushPrefs();
+		}, 800);
 	}
 
 	onDataUpdated(): void {
@@ -996,17 +1001,18 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * Mark in-session prefs as needing persistence. Does NOT write config — see
-	 * _prefsDirty. The actual write happens in _flushPrefs() on view close.
+	 * Mark in-session prefs as needing persistence, then debounce a write back to
+	 * the .base file so drag/drop, color, and width changes survive view rebuilds.
 	 */
 	private _persistPrefs(): void {
 		this._prefsDirty = true;
+		this._debouncedFlushPrefs();
 	}
 
 	/**
-	 * Write the in-session prefs to the .base config. Called only from onClose,
-	 * never mid-session: each config.set() makes the Bases host rebuild the view
-	 * (a visible flash), which is acceptable only when the view is closing.
+	 * Write the in-session prefs to the .base config. This may run on a debounced
+	 * timer during the session and again on close so Bases state is durable even
+	 * if the host rebuilds the view before the tab is dismissed.
 	 */
 	private _flushPrefs(): void {
 		try {
@@ -2747,13 +2753,13 @@ export class KanbanView extends BasesView {
 		this._closed = true;
 		openKanbanViews.delete(this);
 		this._debouncedRender.cancel();
+		this._debouncedFlushPrefs.cancel();
 		// NOTE: the property-suggester patch is deliberately NOT removed here —
 		// Bases closes the view whenever its tab goes background, which is when
 		// the user edits note properties. main.ts restores it on plugin unload.
-		// Flush any in-session pref changes (card/column order, colors, widths) to
-		// the .base config now. We deliberately never write config during a session
-		// because each write makes the Bases host rebuild the whole view (a visible
-		// flash); on close the view is going away, so the rebuild is invisible.
+		// Flush any remaining in-session pref changes (card/column order, colors,
+		// widths) to the .base config now. Most writes already happen on a debounced
+		// timer during the session; close is the final durability sweep.
 		this._flushPrefs();
 		this.destroySortables();
 		this.activeColorPicker?.remove();
