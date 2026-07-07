@@ -23,73 +23,61 @@
 	overflow: hidden;
 }
 
-/* Minimal-mode toggle. Default home is Obsidian's native Bases toolbar, where
-   it carries the .bases-toolbar-item class and inherits that row's styling —
-   we only add the icon layout and an active highlight. */
-.obk-minimal-toggle {
+/* View toggles (minimal / masonry): one group injected into Obsidian's
+   native Bases toolbar as a single .bases-toolbar-item. Each button mirrors
+   the native .text-icon-button structure; we still set our own padding, gap
+   and hover so spacing never depends on undocumented core styles. */
+.obk-toolbar-toggles {
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
+	gap: var(--size-2-1);
+}
+
+.obk-toolbar-toggles .text-icon-button {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	padding: var(--size-2-2) var(--size-2-3);
+	border-radius: var(--radius-s);
 	cursor: pointer;
-}
-
-.obk-minimal-toggle-icon {
-	display: inline-flex;
-	align-items: center;
-}
-
-.obk-minimal-toggle--active {
-	color: var(--text-accent);
-}
-
-/* Fallback only: a self-contained floating button in the board's top-right,
-   used if the native toolbar can't be located. */
-.obk-minimal-toggle--floating {
-	position: absolute;
-	top: 6px;
-	right: 8px;
-	z-index: 20;
-	height: 26px;
-	padding: 0 9px;
-	border-radius: 6px;
-	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
-	background: var(--background-secondary);
-	border: 1px solid var(--background-modifier-border);
-	--icon-size: var(--icon-xs);
+	font-size: var(--font-ui-small);
 }
 
-.obk-minimal-toggle--floating:hover {
+.obk-toolbar-toggles .text-icon-button:hover {
 	color: var(--text-normal);
-	background: var(--background-modifier-hover);
+	background-color: var(--background-modifier-hover);
 }
 
-.obk-minimal-toggle--floating.obk-minimal-toggle--active {
-	color: var(--text-on-accent);
-	background: var(--interactive-accent);
-	border-color: var(--interactive-accent);
-}
-
-/* Minimal mode: hide the property labels (階段 / 重點 …); keep the values. */
-.obk-minimal .obk-card-property-label {
-	display: none;
-}
-
-/* Masonry (瀑布) mode toggle — same structure as minimal toggle. */
-.obk-masonry-toggle {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	cursor: pointer;
-}
-
+.obk-minimal-toggle-icon,
 .obk-masonry-toggle-icon {
 	display: inline-flex;
 	align-items: center;
 }
 
+.obk-minimal-toggle--active,
 .obk-masonry-toggle--active {
 	color: var(--text-accent);
+}
+
+/* Fallback only: the whole group floats in the board's top-right corner if
+   the native toolbar can't be located. */
+.obk-toolbar-toggles--floating {
+	position: absolute;
+	top: 6px;
+	right: 8px;
+	z-index: 20;
+	padding: 2px;
+	border-radius: 6px;
+	font-size: var(--font-ui-smaller);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	--icon-size: var(--icon-xs);
+}
+
+/* Minimal mode: hide the property labels (階段 / 重點 …); keep the values. */
+.obk-minimal .obk-card-property-label {
+	display: none;
 }
 
 /* Masonry board: CSS multi-column card gallery. */

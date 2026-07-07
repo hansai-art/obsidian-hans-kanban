@@ -202,13 +202,16 @@ export const CSS_CLASSES = {
 	COLUMN_RESIZE_HANDLE: 'obk-column-resize-handle',
 	COLUMN_RESIZING: 'obk-column--resizing',
 
-	// Minimal (zen) mode: hide property labels. Toggle injected into Obsidian's
+	// View toggles (minimal / masonry), injected as one group into Obsidian's
 	// native Bases toolbar (canvas stays clean); floating fallback if not found.
+	TOOLBAR_TOGGLES: 'obk-toolbar-toggles',
+	TOOLBAR_TOGGLES_FLOATING: 'obk-toolbar-toggles--floating',
+
+	// Minimal (zen) mode: hide property labels.
 	MINIMAL: 'obk-minimal',
 	MINIMAL_TOGGLE: 'obk-minimal-toggle',
 	MINIMAL_TOGGLE_ICON: 'obk-minimal-toggle-icon',
 	MINIMAL_TOGGLE_ACTIVE: 'obk-minimal-toggle--active',
-	MINIMAL_TOGGLE_FLOATING: 'obk-minimal-toggle--floating',
 
 	// Masonry (flow) mode: cards flow in a CSS column-count grid, no groupBy columns.
 	MASONRY_BOARD: 'obk-masonry-board',
