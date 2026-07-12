@@ -87,4 +87,7 @@ export const zhTW: Record<StringKey, string> = {
 	'demo.removedPartial': '範例檔案已移除。資料夾裡還有你自己的檔案，所以保留了資料夾。',
 	'demo.removeMissing': '找不到範例看板，沒有東西可以移除。',
 	'demo.removeFailed': '無法移除範例看板。',
+	'settings.demoFolder.name': '範例看板資料夾',
+	'settings.demoFolder.desc':
+		'「建立範例看板」會建在這個資料夾（vault 相對路徑）。「移除範例看板」也依這裡尋找，改路徑前請先移除既有範例。留空會恢復預設值。',
 };

@@ -17,6 +17,7 @@ import {
 	setSuggesterOptionsPersistence,
 } from './kanbanView.ts';
 import { openRecolorModal } from './recolorModal.ts';
+import { type KanbanPluginSettings, KanbanSettingTab, parseSettings } from './settings.ts';
 
 export const KANBAN_VIEW_TYPE = 'hans-kanban-view';
 
@@ -55,6 +56,15 @@ function parseLegacyData(data: unknown): LegacyData | null {
 }
 
 export default class KanbanBasesViewPlugin extends Plugin {
+	settings!: KanbanPluginSettings;
+	/** The full plugin.data.json object; settings live under its `settings` key. */
+	private data: Record<string, unknown> = {};
+
+	async saveSettings(): Promise<void> {
+		this.data.settings = this.settings;
+		await this.saveData(this.data);
+	}
+
 	async onload() {
 		// Read any data previously saved to plugin.data.json and pass it to each
 		// view instance so it can lazily migrate state into the base config on
@@ -92,6 +102,9 @@ export default class KanbanBasesViewPlugin extends Plugin {
 		// the write-time patch and the auto-color listener effective from app
 		// startup — no board render needed first. Board renders keep them fresh.
 		const data = isRecord(raw) ? { ...raw } : {};
+		this.data = data;
+		this.settings = parseSettings(data.settings);
+		this.addSettingTab(new KanbanSettingTab(this.app, this));
 		setSuggesterOptionsPersistence(data.suggesterOptions, (options) => {
 			data.suggesterOptions = options;
 			void this.saveData(data);
@@ -104,7 +117,7 @@ export default class KanbanBasesViewPlugin extends Plugin {
 			id: 'create-demo-board',
 			name: t('command.createDemo'),
 			callback: () => {
-				void createDemoBoard(this.app);
+				void createDemoBoard(this.app, this.settings.demoFolder);
 			},
 		});
 
@@ -114,7 +127,7 @@ export default class KanbanBasesViewPlugin extends Plugin {
 			id: 'remove-demo-board',
 			name: t('command.removeDemo'),
 			callback: () => {
-				void removeDemoBoard(this.app);
+				void removeDemoBoard(this.app, this.settings.demoFolder);
 			},
 		});
 
@@ -135,7 +148,7 @@ export default class KanbanBasesViewPlugin extends Plugin {
 			await this.saveData(data);
 			this.app.workspace.onLayoutReady(() => {
 				new DemoPromptModal(this.app, () => {
-					void createDemoBoard(this.app);
+					void createDemoBoard(this.app, this.settings.demoFolder);
 				}).open();
 			});
 		}

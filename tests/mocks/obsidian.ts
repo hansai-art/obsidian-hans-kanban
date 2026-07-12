@@ -154,6 +154,45 @@ export class Plugin {
 	registerHoverLinkSource?(id: string, info: any): void {
 		// Mock implementation
 	}
+
+	addSettingTab(_tab: unknown): void {
+		// Mock implementation
+	}
+}
+
+export class PluginSettingTab {
+	app: App;
+	containerEl: HTMLElement;
+
+	constructor(app: App, _plugin: unknown) {
+		this.app = app;
+		this.containerEl = document.createElement('div');
+	}
+
+	display(): void {}
+	hide(): void {}
+}
+
+export class Setting {
+	settingEl: HTMLElement;
+
+	constructor(containerEl: HTMLElement) {
+		this.settingEl = document.createElement('div');
+		containerEl.appendChild(this.settingEl);
+	}
+
+	setName(_name: string): this {
+		return this;
+	}
+
+	setDesc(_desc: string): this {
+		return this;
+	}
+
+	addText(cb: (text: TextComponent) => unknown): this {
+		cb(new TextComponent(this.settingEl));
+		return this;
+	}
 }
 
 export function setIcon(parent: HTMLElement, iconId: string): void {

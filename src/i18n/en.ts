@@ -86,6 +86,9 @@ export const en = {
 	'demo.removedPartial': 'Demo files removed. The folder was kept because it still contains files of your own.',
 	'demo.removeMissing': 'No demo board found: nothing to remove.',
 	'demo.removeFailed': 'Could not remove the demo board.',
+	'settings.demoFolder.name': 'Demo board folder',
+	'settings.demoFolder.desc':
+		'Vault-relative folder where "Create demo board" builds the sample. "Remove demo board" looks in the same place, so remove an existing demo before changing this. Empty resets to the default.',
 } as const;
 
 export type StringKey = keyof typeof en;

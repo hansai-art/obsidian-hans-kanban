@@ -111,6 +111,36 @@ describe('removeDemoBoard', () => {
 	});
 });
 
+describe('removeDemoBoard with a custom folder', () => {
+	test('looks up the configured folder instead of the default', async () => {
+		const custom = 'ZZ-附件/Kanban demo';
+		const md = Object.assign(new TFile(), {
+			path: `${custom}/01 歡迎 Welcome.md`,
+			name: '01 歡迎 Welcome.md',
+			basename: '01 歡迎 Welcome',
+			extension: 'md',
+		});
+		const folder: TFolder = Object.assign(new TFolder(), { path: custom, name: 'Kanban demo', children: [md] });
+		const trashed: string[] = [];
+		const app = {
+			vault: {
+				getFolderByPath: (path: string) => (path === custom ? folder : null),
+				read: async () => DEMO_MD,
+			},
+			fileManager: {
+				trashFile: async (file: TFile | TFolder) => {
+					trashed.push(file.path);
+					folder.children = folder.children.filter((c) => c !== file);
+				},
+			},
+		} as any;
+
+		await removeDemoBoard(app, custom);
+
+		assert.deepStrictEqual(trashed, [md.path, custom]);
+	});
+});
+
 describe('createDemoBoard', () => {
 	test('creates the tutorial notes plus a two-view base (kanban + masonry flow)', async () => {
 		const created: Record<string, string> = {};
@@ -133,16 +163,17 @@ describe('createDemoBoard', () => {
 			},
 		} as any;
 
-		await createDemoBoard(app);
+		await createDemoBoard(app, 'ZZ-附件/Kanban demo');
 
 		const mdPaths = Object.keys(created).filter((p) => p.endsWith('.md'));
 		assert.strictEqual(mdPaths.length, 7, 'seven tutorial cards');
 		for (const path of mdPaths) {
+			assert.ok(path.startsWith('ZZ-附件/Kanban demo/'), `${path} must live in the custom folder`);
 			assert.match(created[path], /^hans_kanban_demo: true$/m, `${path} must carry the removal flag`);
 			assert.match(created[path], /^stars: /m, `${path} must have a stars rating for the flow sort`);
 		}
 
-		const basePath = `${DEMO_FOLDER}/範例看板 Demo.base`;
+		const basePath = 'ZZ-附件/Kanban demo/範例看板 Demo.base';
 		const base = created[basePath];
 		assert.ok(base, 'demo .base created');
 		assert.ok(base.includes('name: 範例看板 Demo'), 'kanban view present');

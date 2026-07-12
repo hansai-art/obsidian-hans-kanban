@@ -12,8 +12,9 @@ import { t } from './i18n/index.ts';
  * and is trivial to delete.
  */
 
-const DEMO_FOLDER = 'Hans Kanban 範例';
-const DEMO_BASE = `${DEMO_FOLDER}/範例看板 Demo.base`;
+/** Default demo location; the settings tab lets users point this anywhere. */
+export const DEFAULT_DEMO_FOLDER = 'Hans Kanban 範例';
+const DEMO_BASE_NAME = '範例看板 Demo.base';
 
 // Two axes, like a real board: columns come from `area` (each gets its own
 // backplate color via columnColors), while `status` colors each card and is the
@@ -182,8 +183,8 @@ views:
  * Create the demo folder, notes, and base, then open the board. If the board
  * already exists, just open it instead of duplicating anything.
  */
-export async function createDemoBoard(app: App): Promise<void> {
-	const basePath = normalizePath(DEMO_BASE);
+export async function createDemoBoard(app: App, demoFolder: string = DEFAULT_DEMO_FOLDER): Promise<void> {
+	const basePath = normalizePath(`${demoFolder}/${DEMO_BASE_NAME}`);
 	try {
 		const existing = app.vault.getAbstractFileByPath(basePath);
 		if (existing instanceof TFile) {
@@ -192,13 +193,13 @@ export async function createDemoBoard(app: App): Promise<void> {
 			return;
 		}
 
-		const folderPath = normalizePath(DEMO_FOLDER);
+		const folderPath = normalizePath(demoFolder);
 		if (!app.vault.getAbstractFileByPath(folderPath)) {
 			await app.vault.createFolder(folderPath);
 		}
 
 		for (const note of DEMO_NOTES) {
-			const path = normalizePath(`${DEMO_FOLDER}/${note.file}`);
+			const path = normalizePath(`${demoFolder}/${note.file}`);
 			if (!app.vault.getAbstractFileByPath(path)) {
 				await app.vault.create(path, noteContent(note));
 			}
@@ -223,8 +224,8 @@ const DEMO_FLAG_LINE = /^hans_kanban_demo: true$/m;
  * then. Anything the user added to the folder (no demo flag, subfolders) is
  * kept, and the Notice says so.
  */
-export async function removeDemoBoard(app: App): Promise<void> {
-	const folder = app.vault.getFolderByPath(normalizePath(DEMO_FOLDER));
+export async function removeDemoBoard(app: App, demoFolder: string = DEFAULT_DEMO_FOLDER): Promise<void> {
+	const folder = app.vault.getFolderByPath(normalizePath(demoFolder));
 	if (!(folder instanceof TFolder)) {
 		new Notice(t('demo.removeMissing'));
 		return;
