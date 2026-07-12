@@ -3774,6 +3774,17 @@ describe('applyCardOrder', () => {
 		assert.strictEqual(result[0].file.path, 'a.md');
 		assert.strictEqual(result[1].file.path, 'b.md');
 	});
+
+	test('duplicate paths in savedOrder render each entry only once', () => {
+		const a = createMockBasesEntry(createMockTFile('a.md'), {});
+		const b = createMockBasesEntry(createMockTFile('b.md'), {});
+
+		const result = view.applyCardOrder([a, b], ['b.md', 'b.md', 'a.md', 'b.md']);
+
+		assert.strictEqual(result.length, 2);
+		assert.strictEqual(result[0].file.path, 'b.md');
+		assert.strictEqual(result[1].file.path, 'a.md');
+	});
 });
 
 // ---------------------------------------------------------------------------

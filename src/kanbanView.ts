@@ -2427,11 +2427,15 @@ export class KanbanView extends BasesView {
 			: null;
 		const newLaneValue = swimlaneActive ? newLaneEl.getAttribute(DATA_ATTRIBUTES.SWIMLANE_VALUE) : null;
 
-		// Helper: read card paths from a column body element
-		const getColumnPaths = (bodyEl: Element): string[] =>
-			Array.from(bodyEl.querySelectorAll(`.${CSS_CLASSES.CARD}`))
+		// Helper: read card paths from a column body element. Dedupe defensively:
+		// if duplicate cards ever make it into the DOM, persisting them here
+		// would corrupt cardOrders permanently.
+		const getColumnPaths = (bodyEl: Element): string[] => {
+			const paths = Array.from(bodyEl.querySelectorAll(`.${CSS_CLASSES.CARD}`))
 				.map((c) => (c.instanceOf(HTMLElement) ? c.getAttribute(DATA_ATTRIBUTES.ENTRY_PATH) : null))
 				.filter((p): p is string => p !== null);
+			return [...new Set(paths)];
+		};
 
 		const oldKey = this.cardOrderKey(oldLaneValue, oldColumnValue ?? '');
 		const newKey = this.cardOrderKey(newLaneValue, newColumnValue);
@@ -2596,9 +2600,14 @@ export class KanbanView extends BasesView {
 	}
 
 	private applyCardOrder(entries: BasesEntry[], savedOrder: string[]): BasesEntry[] {
+		// savedOrder persisted by older builds may contain duplicate paths; dedupe
+		// so a card can never render twice (duplicate DOM cards get re-persisted
+		// by drag handlers, making the corruption self-sustaining).
+		const uniqueOrder = [...new Set(savedOrder)];
 		const entryMap = new Map(entries.map((e) => [e.file.path, e]));
-		const ordered = savedOrder.map((p) => entryMap.get(p)).filter((e): e is BasesEntry => e !== undefined);
-		const unsaved = entries.filter((e) => !savedOrder.includes(e.file.path));
+		const ordered = uniqueOrder.map((p) => entryMap.get(p)).filter((e): e is BasesEntry => e !== undefined);
+		const orderedPaths = new Set(uniqueOrder);
+		const unsaved = entries.filter((e) => !orderedPaths.has(e.file.path));
 		return [...ordered, ...unsaved];
 	}
 
