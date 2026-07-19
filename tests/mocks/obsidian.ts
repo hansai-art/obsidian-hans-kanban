@@ -73,9 +73,14 @@ export interface App {
 	vault: {
 		getMarkdownFiles(): TFile[];
 		getFolderByPath(path: string): TFolder | { path: string; name: string } | null;
+		getRoot?(): TFolder;
 		getAbstractFileByPath(path: string): TFile | null;
 		getResourcePath(file: { path: string }): string;
 		read?(file: TFile): Promise<string>;
+		on?(name: string, callback: (...args: any[]) => void): unknown;
+		offref?(ref: unknown): void;
+		/** Test-only escape hatch for firing vault events. */
+		emit?(name: string, ...args: any[]): void;
 	};
 	renderContext: RenderContext;
 }

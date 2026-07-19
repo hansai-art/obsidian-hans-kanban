@@ -123,6 +123,15 @@
 - **範例看板**：指令面板輸入「建立範例看板」，一鍵生出一塊可以玩的示範看板（含看板、瀑布兩種視圖，教你左上角切換），不會動到你既有的筆記。看完輸入「移除範例看板」一鍵清掉，只刪範例檔，你自己的檔案不會動。
 - **新視圖不會壞**：新增視圖會自動沿用現有看板的設定；還沒設定的視圖會顯示引導卡（複製設定 / 選分欄欄位 / 建範例），分欄欄位打錯也只會出提示條，版面不會壞。
 
+## 資料存取範圍
+
+這個外掛不連網路、不上傳任何內容，所有動作都在你的 vault 本機完成。會讀到「單一資料夾以外」的地方只有兩個時機，而且都要你自己下指令才會跑：
+
+- **改狀態名稱 / 換狀態顏色**：需要掃過筆記的 frontmatter，把所有用到該狀態的筆記一起改掉，並統計每個狀態目前有幾張卡在用。
+- **同步看板設定**：只開啟副檔名為 `.base` 的設定檔，更新裡面的狀態順序，讓每一塊看板的欄位順序一致。
+
+平常開看板、拖卡片、快速新增卡片都不會做全庫掃描：新卡片是從 Obsidian 的建檔事件直接取得，改名的卡片只會在它原本所在的資料夾裡找。
+
 ---
 
 ## English
@@ -200,6 +209,15 @@ Renames and recolors also sync to the property suggester and, if you use the Met
 - **Minimal mode**: a toolbar toggle hides per-card property labels for a cleaner board.
 - **Demo board**: command palette → "Create demo board" builds a playground board (with both a kanban and a masonry flow view, so you learn the view switcher) without touching your notes. Done exploring? "Remove demo board" cleans it all up and never touches your own files.
 - **Views that don't break**: a new view auto-inherits the settings of your configured board; unconfigured views show a guided setup card, and a bad group-by property only shows a warning banner.
+
+### Data access
+
+The plugin makes no network requests and uploads nothing; everything happens locally in your vault. Only two operations look beyond a single folder, and both run solely on a command you invoke yourself:
+
+- **Renaming or recoloring a status**: reads note frontmatter across the vault to rewrite every note using that status, and to count how many cards each status currently has.
+- **Keeping boards in sync**: opens files with the `.base` extension only, to update the stored status order so every board lists its columns the same way.
+
+Everyday use never scans the vault: newly created cards come straight from Obsidian's file-creation event, and a renamed card is looked up only within the folder it already lived in.
 
 ## Development
 

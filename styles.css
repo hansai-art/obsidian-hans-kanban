@@ -127,22 +127,28 @@
 	display: none;
 }
 
-/* Masonry board: CSS multi-column card gallery. Store review warns that
-   multi-column is "partially supported" against its 1.9.x baseline; this
-   plugin's minAppVersion is 1.10.2 (Bases requirement) and the layout is
-   verified in Obsidian's bundled Chromium, so the warning does not apply. */
+/* Masonry board: equal-width flex columns, filled by _renderMasonry() in
+   kanbanView.ts (shortest-column-first, so column heights stay balanced).
+   Deliberately not the CSS multi-column module, which store review reports as
+   only partially supported. */
 .obk-masonry-board {
-	column-count: var(--obk-masonry-columns, 4);
-	column-gap: 8px;
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
 	padding: 8px;
 	overflow-y: auto;
 	flex: 1;
 }
 
-.obk-masonry-board .obk-card {
-	break-inside: avoid;
-	margin-bottom: 8px;
-	display: block;
+/* Cards are stretched to the column width by the default align-items: stretch.
+   Do NOT add width: 100% here — with content-box sizing that would add the
+   card's padding and border on top of the column width and overflow it. */
+.obk-masonry-col {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	flex: 1 1 0;
+	min-width: 0;
 }
 
 /* Property Selector */

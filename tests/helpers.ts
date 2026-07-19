@@ -1,9 +1,9 @@
 import { mock } from 'node:test';
 import { JSDOM } from 'jsdom';
-import type { App, BasesEntry, BasesPropertyId, QueryController, TFile } from 'obsidian';
+import type { App, BasesEntry, BasesPropertyId, QueryController } from 'obsidian';
 import type Sortable from 'sortablejs';
 import { DEBOUNCE_DELAY } from '../src/constants.ts';
-import { BooleanValue, NumberValue, StringValue } from './mocks/obsidian.ts';
+import { BooleanValue, NumberValue, StringValue, TFile, TFolder } from './mocks/obsidian.ts';
 
 // Setup jsdom environment
 const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
@@ -166,8 +166,10 @@ if (!EventProto.instanceOf) {
 }
 
 // Mock TFile
+// A real TFile instance, not an object literal: production code narrows vault
+// events and folder children with `instanceof TFile`.
 export function createMockTFile(path: string, basename?: string, parent?: { path: string; name: string }): TFile {
-	return {
+	return Object.assign(new TFile(), {
 		path,
 		name: path.split('/').pop() || path,
 		basename:
@@ -185,7 +187,7 @@ export function createMockTFile(path: string, basename?: string, parent?: { path
 		},
 		vault: {} as any,
 		parent: parent ?? null,
-	} as TFile;
+	});
 }
 
 // Mock BasesEntry
@@ -299,6 +301,37 @@ export function createMockApp(imageFiles: Record<string, { path: string }> = {})
 	const renameFile = createMockFn();
 	const markdownFiles: any[] = [];
 
+	// Vault event bus, so production code can resolve newly created files from
+	// the `create` event instead of diffing a full vault listing.
+	const vaultListeners = new Map<string, Array<(...args: any[]) => void>>();
+	const on = (name: string, callback: (...args: any[]) => void) => {
+		const listeners = vaultListeners.get(name) ?? [];
+		listeners.push(callback);
+		vaultListeners.set(name, listeners);
+		return { name, callback };
+	};
+	const offref = (ref: any) => {
+		const listeners = vaultListeners.get(ref?.name);
+		if (!listeners) return;
+		const index = listeners.indexOf(ref.callback);
+		if (index >= 0) listeners.splice(index, 1);
+	};
+	/** Test-only: fire a vault event, e.g. emit('create', createMockTFile(...)). */
+	const emit = (name: string, ...args: any[]) => {
+		for (const callback of [...(vaultListeners.get(name) ?? [])]) callback(...args);
+	};
+
+	const parentPathOf = (path: string) => {
+		const index = path.lastIndexOf('/');
+		return index === -1 ? '' : path.slice(0, index);
+	};
+	const folderAt = (path: string) =>
+		Object.assign(new TFolder(), {
+			path,
+			name: path.split('/').pop() ?? path,
+			children: markdownFiles.filter((file) => parentPathOf(file.path) === path),
+		});
+
 	return {
 		workspace: {
 			openLinkText,
@@ -321,9 +354,13 @@ export function createMockApp(imageFiles: Record<string, { path: string }> = {})
 		} as any,
 		vault: {
 			getMarkdownFiles: () => markdownFiles,
-			getFolderByPath: (path: string) => ({ path, name: path.split('/').pop() ?? path }),
+			getFolderByPath: (path: string) => folderAt(path),
+			getRoot: () => folderAt(''),
 			getAbstractFileByPath: (path: string) => markdownFiles.find((file) => file.path === path) ?? null,
 			getResourcePath: (file: { path: string }) => `app://fake/${file.path}`,
+			on,
+			offref,
+			emit,
 		} as any,
 		renderContext: { hoverPopover: null } as any,
 	} as any;

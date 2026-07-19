@@ -1,5 +1,5 @@
-import type { App, BasesPropertyId, EventRef, TFile } from 'obsidian';
-import { Notice, normalizePath, parsePropertyId, setIcon } from 'obsidian';
+import type { App, BasesPropertyId, EventRef } from 'obsidian';
+import { Notice, TFile, normalizePath, parsePropertyId, setIcon } from 'obsidian';
 import { QuickAddModal } from '../quickAddModal.ts';
 import { CSS_CLASSES, UNCATEGORIZED_LABEL } from '../constants.ts';
 import { t } from '../i18n/index.ts';
@@ -36,14 +36,6 @@ function getWritableFrontmatterPropertyName(propertyId: BasesPropertyId | null):
 	return parsed.name || null;
 }
 
-function getCreatedMarkdownFile(app: App, previousPaths: Set<string>, baseFileName: string): TFile | null {
-	const createdFiles = app.vault.getMarkdownFiles().filter((file) => !previousPaths.has(file.path));
-	if (createdFiles.length === 0) return null;
-
-	const preferredBasename = baseFileName.split('/').pop() ?? baseFileName;
-	return createdFiles.find((file) => file.basename === preferredBasename) ?? createdFiles[0] ?? null;
-}
-
 function getParentPath(path: string): string {
 	const normalizedPath = normalizePath(path);
 	const separatorIndex = normalizedPath.lastIndexOf('/');
@@ -54,18 +46,31 @@ function isFileInFolder(file: TFile, folder: string): boolean {
 	return getParentPath(file.path) === normalizePath(folder);
 }
 
-function waitForCreatedMarkdownFile(app: App, previousPaths: Set<string>, baseFileName: string): Promise<TFile | null> {
+/**
+ * Resolve the note Bases just created for this card. The vault's `create`
+ * event hands the new TFile straight to the listener, so the plugin never has
+ * to enumerate (and diff) every markdown path in the vault to spot it.
+ *
+ * A note whose basename matches the typed title wins immediately; any other
+ * new note is held as a fallback for one settle window in case the exact match
+ * is still on its way.
+ */
+function waitForCreatedMarkdownFile(app: App, baseFileName: string): Promise<TFile | null> {
 	if (typeof app.vault.on !== 'function' || typeof app.vault.offref !== 'function') {
 		return Promise.resolve(null);
 	}
+	const preferredBasename = baseFileName.split('/').pop() ?? baseFileName;
 
 	return new Promise((resolve) => {
 		let eventRef: EventRef | null = null;
 		let timeoutId: number | null = null;
+		let settleId: number | null = null;
+		let fallback: TFile | null = null;
 		let settled = false;
 
 		const cleanup = () => {
 			if (timeoutId !== null) window.clearTimeout(timeoutId);
+			if (settleId !== null) window.clearTimeout(settleId);
 			if (eventRef) app.vault.offref(eventRef);
 		};
 
@@ -76,18 +81,17 @@ function waitForCreatedMarkdownFile(app: App, previousPaths: Set<string>, baseFi
 			resolve(file);
 		};
 
-		const finishIfCreated = () => {
-			const createdFile = getCreatedMarkdownFile(app, previousPaths, baseFileName);
-			if (createdFile) finish(createdFile);
-		};
-
-		eventRef = app.vault.on('create', () => {
-			finishIfCreated();
-			window.setTimeout(finishIfCreated, CREATED_CARD_SETTLE_MS);
+		eventRef = app.vault.on('create', (file) => {
+			if (!(file instanceof TFile) || file.extension !== 'md') return;
+			if (file.basename === preferredBasename) {
+				finish(file);
+				return;
+			}
+			if (fallback) return;
+			fallback = file;
+			settleId = window.setTimeout(() => finish(fallback), CREATED_CARD_SETTLE_MS);
 		});
-		timeoutId = window.setTimeout(() => {
-			finish(getCreatedMarkdownFile(app, previousPaths, baseFileName));
-		}, CREATED_CARD_TIMEOUT_MS);
+		timeoutId = window.setTimeout(() => finish(fallback), CREATED_CARD_TIMEOUT_MS);
 	});
 }
 
@@ -107,12 +111,11 @@ function getAvailablePath(app: App, folder: string, fileName: string): string {
 
 async function ensureCreatedCardInFolder(
 	app: App,
-	previousPaths: Set<string>,
 	createdFilePromise: Promise<TFile | null>,
 	baseFileName: string,
 	folder: string,
 ): Promise<void> {
-	const createdFile = getCreatedMarkdownFile(app, previousPaths, baseFileName) ?? (await createdFilePromise);
+	const createdFile = await createdFilePromise;
 	if (!createdFile) {
 		new Notice(`Created card, but could not move it to ${folder}.`);
 		return;
@@ -179,8 +182,9 @@ export async function createQuickAddCard(
 		return;
 	}
 	const fileNameToCreate = normalizePath(`${targetFolder}/${baseFileName}`);
-	const createdFilePaths = new Set(ctx.app.vault.getMarkdownFiles().map((file) => file.path));
-	const createdFilePromise = waitForCreatedMarkdownFile(ctx.app, createdFilePaths, fileNameToCreate);
+	// Listener goes up before the file is created, so the create event cannot
+	// slip past us.
+	const createdFilePromise = waitForCreatedMarkdownFile(ctx.app, fileNameToCreate);
 
 	const setFrontmatter = (frontmatter: Record<string, unknown>): void => {
 		if (columnValue === UNCATEGORIZED_LABEL) {
@@ -200,7 +204,7 @@ export async function createQuickAddCard(
 	try {
 		await cb.createFileForView(fileNameToCreate, setFrontmatter);
 		closeNativeNewItemPopover(ctx.doc);
-		await ensureCreatedCardInFolder(ctx.app, createdFilePaths, createdFilePromise, baseFileName, targetFolder);
+		await ensureCreatedCardInFolder(ctx.app, createdFilePromise, baseFileName, targetFolder);
 	} catch (error) {
 		console.error('Error creating kanban card:', error);
 		new Notice(t('quickAdd.createFailed'));

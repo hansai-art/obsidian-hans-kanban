@@ -52,6 +52,7 @@ import {
 	EMOJI_COLOR_MAP,
 	EMPTY_STATE_MESSAGES,
 	HOVER_LINK_SOURCE_ID,
+	MASONRY_REBALANCE_DELAY,
 	SORTABLE_CONFIG,
 	SORTABLE_GROUP,
 	SORTED_CARD_ORDER_NOTICE,
@@ -352,7 +353,15 @@ export function countValueUsage(app: App, propertyName: string): Map<string, num
 	return counts;
 }
 
-/** Run a content transform over every .base file in the vault. */
+/**
+ * Run a content transform over every .base file in the vault.
+ *
+ * This is the one place that still needs a full vault listing: renaming a
+ * status has to update the fixed `cardColorOrder` list of every board that
+ * uses it, and Obsidian exposes no "list files by extension" API. Only files
+ * with the `.base` extension are opened, and only a user-invoked status
+ * command reaches this code path — nothing runs on load or on render.
+ */
 async function rewriteBaseConfigs(app: App, transform: (content: string) => string): Promise<void> {
 	for (const file of app.vault.getFiles()) {
 		if (file.extension !== 'base') continue;
@@ -680,6 +689,14 @@ export class KanbanView extends BasesView {
 	private _masonryModeDirty = false;
 	private _masonryMode = false;
 	private _lastMasonryEntriesKey = '';
+	/** Card elements currently laid out in the masonry board, in sorted order. */
+	private _masonryCards: HTMLElement[] = [];
+	/** The masonry column containers the cards above are distributed into. */
+	private _masonryColumnEls: HTMLElement[] = [];
+	private _masonryResizeObserver: ResizeObserver | null = null;
+	private _masonryRebalance: DebouncedFn<() => void> | null = null;
+	/** Guard so the rebalance's own DOM moves cannot re-trigger the observer. */
+	private _masonryBalancing = false;
 	private _toolbarToggles: ToolbarToggleGroup | null = null;
 
 	/** The .bases-view wrapper we tagged with the host class (see _ensureBasesHostClass). */
@@ -1159,7 +1176,6 @@ export class KanbanView extends BasesView {
 					this.containerEl.empty();
 				}
 				const cols = Math.max(2, Math.min(12, Number(this.config?.get('masonryColumns')) || 4));
-				this.containerEl.style.setProperty('--obk-masonry-columns', String(cols));
 				const colorPropId = this.cardColorPropertyId;
 				const sortPropId = this.masonrySortPropertyId;
 				const entriesKey =
@@ -1172,7 +1188,7 @@ export class KanbanView extends BasesView {
 					this._lastMasonryEntriesKey !== entriesKey
 				) {
 					this._lastMasonryEntriesKey = entriesKey;
-					this._renderMasonry(entries);
+					this._renderMasonry(entries, cols);
 				}
 				this._ensureConfigWarning(false);
 				this._applyMinimalMode();
@@ -1180,7 +1196,9 @@ export class KanbanView extends BasesView {
 				return;
 			}
 			// Leaving masonry mode — the masonry board will be cleared by fullRebuild
-			// below (existingBoard is null when no .obk-board exists).
+			// below (existingBoard is null when no .obk-board exists). Drop the
+			// resize observer with it so it cannot outlive the board it watched.
+			this._teardownMasonryObserver();
 			this._ensureToolbarToggles();
 
 			// Group entries — 2D when swimlanes are active, 1D otherwise. The
@@ -1867,8 +1885,14 @@ export class KanbanView extends BasesView {
 		}
 	}
 
-	/** Render all entries as a flat CSS multi-column card gallery (masonry layout). */
-	private _renderMasonry(entries: BasesEntry[]): void {
+	/**
+	 * Render all entries as a masonry card gallery: `cols` equal-width flex
+	 * columns, cards distributed shortest-column-first (see _distributeMasonry).
+	 * Not CSS multi-column — store review flags those properties as only
+	 * partially supported.
+	 */
+	private _renderMasonry(entries: BasesEntry[], cols: number): void {
+		this._teardownMasonryObserver();
 		this.containerEl.empty();
 		this.containerEl.classList.remove(CSS_CLASSES.VIEW_CONTAINER_WITH_SWIMLANES);
 		const boardEl = this.containerEl.createDiv({ cls: CSS_CLASSES.MASONRY_BOARD });
@@ -1904,9 +1928,84 @@ export class KanbanView extends BasesView {
 				return 0;
 			});
 		}
-		for (const entry of sorted) {
-			boardEl.appendChild(createCardEl(entry, ctx, callbacks));
+		const columnEls: HTMLElement[] = [];
+		for (let i = 0; i < cols; i++) {
+			columnEls.push(boardEl.createDiv({ cls: CSS_CLASSES.MASONRY_COLUMN }));
 		}
+		// Park every card in the first column first: it is already at its final
+		// width (flex: 1 1 0 across `cols` siblings), so heights measured there
+		// are the heights the cards will have wherever they end up. Nothing is
+		// painted until this task yields, so there is no visible flash.
+		const cards = sorted.map((entry) => createCardEl(entry, ctx, callbacks));
+		for (const card of cards) columnEls[0].appendChild(card);
+
+		this._masonryCards = cards;
+		this._masonryColumnEls = columnEls;
+		this._distributeMasonry();
+		this._observeMasonryResize(boardEl);
+	}
+
+	/**
+	 * Spread `_masonryCards` across `_masonryColumnEls`, always appending the
+	 * next card to whichever column is currently shortest. Card heights are
+	 * measurable up front because cover images carry a fixed aspect-ratio, so
+	 * one measurement pass is enough — no reflow on image load.
+	 *
+	 * Falls back to round-robin when every height reads 0 (detached board, or
+	 * jsdom under test) so the distribution stays deterministic either way.
+	 */
+	private _distributeMasonry(): void {
+		const cards = this._masonryCards;
+		const columnEls = this._masonryColumnEls;
+		if (columnEls.length === 0 || cards.length === 0) return;
+
+		this._masonryBalancing = true;
+		try {
+			const heights = cards.map((card) => card.offsetHeight);
+			const measured = heights.some((height) => height > 0);
+			const totals = new Array<number>(columnEls.length).fill(0);
+			cards.forEach((card, index) => {
+				let target = index % columnEls.length;
+				if (measured) {
+					target = totals.indexOf(Math.min(...totals));
+					totals[target] += heights[index];
+				}
+				columnEls[target].appendChild(card);
+			});
+		} finally {
+			this._masonryBalancing = false;
+		}
+	}
+
+	/**
+	 * Re-run the distribution when the pane is resized: narrower cards wrap
+	 * more text, so the heights the last pass balanced against are stale.
+	 * Debounced, and a no-op where ResizeObserver is unavailable (tests).
+	 */
+	private _observeMasonryResize(boardEl: HTMLElement): void {
+		if (typeof ResizeObserver === 'undefined') return;
+		const rebalance = debounce(() => {
+			if (this._closed || this._masonryBalancing) return;
+			this._distributeMasonry();
+		}, MASONRY_REBALANCE_DELAY);
+		this._masonryRebalance = rebalance;
+		this._masonryResizeObserver = new ResizeObserver(() => {
+			// Moving cards between columns never changes the board's own width,
+			// so this cannot feed back into itself; the guard covers the frame
+			// where a queued observation lands mid-rebalance.
+			if (this._masonryBalancing) return;
+			rebalance();
+		});
+		this._masonryResizeObserver.observe(boardEl);
+	}
+
+	private _teardownMasonryObserver(): void {
+		this._masonryResizeObserver?.disconnect();
+		this._masonryResizeObserver = null;
+		this._masonryRebalance?.cancel();
+		this._masonryRebalance = null;
+		this._masonryCards = [];
+		this._masonryColumnEls = [];
 	}
 
 	/**
@@ -1998,6 +2097,7 @@ export class KanbanView extends BasesView {
 						if (!this._masonryMode && this.containerEl.querySelector(`.${CSS_CLASSES.MASONRY_BOARD}`)) {
 							// Leaving masonry: clear the masonry board so render() sees no
 							// .obk-board and forces a fullRebuild of the kanban layout.
+							this._teardownMasonryObserver();
 							this.containerEl.empty();
 						}
 						this._debouncedRender();
@@ -2632,10 +2732,14 @@ export class KanbanView extends BasesView {
 		if (parts.length < 2) return savedPath;
 		// Prefix = first two hyphen segments, e.g. "C0-2"
 		const prefix = `${parts[0]}-${parts[1]}-`;
+		// Only the renamed card's own folder can hold the replacement, so read
+		// that folder's children instead of enumerating every note in the vault.
+		const folder = dir === '' ? app.vault.getRoot?.() : app.vault.getFolderByPath?.(dir);
+		if (!folder) return savedPath;
 		const candidates: string[] = [];
-		for (const f of app.vault.getMarkdownFiles()) {
-			if (f.parent?.path !== dir) continue;
-			if (f.name.startsWith(prefix)) candidates.push(f.path);
+		for (const child of folder.children) {
+			if (!(child instanceof TFile) || child.extension !== 'md') continue;
+			if (child.name.startsWith(prefix)) candidates.push(child.path);
 			if (candidates.length > 1) return savedPath; // ambiguous
 		}
 		return candidates.length === 1 ? candidates[0] : savedPath;
@@ -2673,6 +2777,7 @@ export class KanbanView extends BasesView {
 		openKanbanViews.delete(this);
 		this._debouncedRender.cancel();
 		this._debouncedFlushPrefs.cancel();
+		this._teardownMasonryObserver();
 		// NOTE: the property-suggester patch is deliberately NOT removed here —
 		// Bases closes the view whenever its tab goes background, which is when
 		// the user edits note properties. main.ts restores it on plugin unload.

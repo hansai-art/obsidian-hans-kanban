@@ -460,6 +460,7 @@ describe('Data Rendering - Column Rendering', () => {
 			frontmatterProcessor?.(frontmatter);
 			(view as any).createFileForViewCalls.push({ baseFileName, frontmatter });
 			markdownFiles = [...markdownFiles, createdFile];
+			(app.vault as any).emit('create', createdFile);
 		};
 
 		await (view as any).createQuickAddCard('New Task', 'Doing', null);
@@ -495,6 +496,7 @@ describe('Data Rendering - Column Rendering', () => {
 			frontmatterProcessor?.(frontmatter);
 			(view as any).createFileForViewCalls.push({ baseFileName, frontmatter });
 			markdownFiles = [...markdownFiles, createdFile];
+			(app.vault as any).emit('create', createdFile);
 		};
 
 		await (view as any).createQuickAddCard('New Task', 'Doing', null);
@@ -530,6 +532,7 @@ describe('Data Rendering - Column Rendering', () => {
 			frontmatterProcessor?.(frontmatter);
 			(view as any).createFileForViewCalls.push({ baseFileName, frontmatter });
 			markdownFiles = [...markdownFiles, createdFile];
+			(app.vault as any).emit('create', createdFile);
 		};
 
 		await (view as any).createQuickAddCard('New Task', 'Doing', null);
@@ -566,6 +569,7 @@ describe('Data Rendering - Column Rendering', () => {
 			frontmatterProcessor?.(frontmatter);
 			(view as any).createFileForViewCalls.push({ baseFileName, frontmatter });
 			markdownFiles = [...markdownFiles, createdFile];
+			(app.vault as any).emit('create', createdFile);
 		};
 
 		await (view as any).createQuickAddCard('New Task', 'Doing', null);
@@ -580,7 +584,6 @@ describe('Data Rendering - Column Rendering', () => {
 		const entries = createEntriesWithStatus();
 		const createdFile = createMockTFile('dashboards/New Task.md');
 		let markdownFiles = [createMockTFile('dashboards/maintenance-board.base')];
-		let createHandler: (() => void) | null = null;
 
 		controller = createMockQueryController(entries, TEST_PROPERTIES);
 		controller.app = app;
@@ -590,11 +593,6 @@ describe('Data Rendering - Column Rendering', () => {
 		(app.vault as any).getMarkdownFiles = () => markdownFiles;
 		(app.vault as any).getFolderByPath = (path: string) => (path === 'energy' ? { path, name: 'energy' } : null);
 		(app.vault as any).getAbstractFileByPath = (path: string) => markdownFiles.find((file) => file.path === path) ?? null;
-		(app.vault as any).on = (name: string, handler: () => void) => {
-			if (name === 'create') createHandler = handler;
-			return { name };
-		};
-		(app.vault as any).offref = () => {};
 
 		const view = new KanbanView(controller, scrollEl);
 		setupKanbanViewWithApp(view, app);
@@ -608,7 +606,7 @@ describe('Data Rendering - Column Rendering', () => {
 			(view as any).createFileForViewCalls.push({ baseFileName, frontmatter });
 			window.setTimeout(() => {
 				markdownFiles = [...markdownFiles, createdFile];
-				createHandler?.();
+				(app.vault as any).emit('create', createdFile);
 			}, 10);
 		};
 
@@ -618,6 +616,75 @@ describe('Data Rendering - Column Rendering', () => {
 			{ baseFileName: 'energy/New Task', frontmatter: { status: 'Doing' } },
 		]);
 		assert.deepStrictEqual(app.fileManager.renameFile.calls[0], [createdFile, 'energy/New Task.md']);
+	});
+
+	// Store review asked us to stop enumerating the whole vault. The created
+	// note now comes from the create event, so quick add must work even if
+	// getMarkdownFiles is never callable.
+	test('quick add never enumerates the vault to find the created note', async () => {
+		const entries = createEntriesWithStatus();
+		const createdFile = createMockTFile('dashboards/New Task.md');
+
+		controller = createMockQueryController(entries, TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = () => PROPERTY_STATUS;
+		controller.config.set('quickAddFolder', 'energy');
+
+		(app.vault as any).getMarkdownFiles = (): never => {
+			throw new Error('quick add must not list the vault');
+		};
+		(app.vault as any).getFolderByPath = (path: string) => (path === 'energy' ? { path, name: 'energy' } : null);
+		(app.vault as any).getAbstractFileByPath = (): null => null;
+
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+		(view as any).createFileForView = async (
+			baseFileName: string,
+			frontmatterProcessor?: (frontmatter: Record<string, unknown>) => void,
+		) => {
+			const frontmatter: Record<string, unknown> = {};
+			frontmatterProcessor?.(frontmatter);
+			(view as any).createFileForViewCalls.push({ baseFileName, frontmatter });
+			(app.vault as any).emit('create', createdFile);
+		};
+
+		await (view as any).createQuickAddCard('New Task', 'Doing', null);
+
+		assert.deepStrictEqual(app.fileManager.renameFile.calls[0], [createdFile, 'energy/New Task.md']);
+	});
+
+	test('quick add ignores non-markdown files created alongside the card', async () => {
+		const entries = createEntriesWithStatus();
+		const attachment = createMockTFile('attachments/pasted.png');
+		const createdFile = createMockTFile('energy/New Task.md');
+
+		controller = createMockQueryController(entries, TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = () => PROPERTY_STATUS;
+		controller.config.set('quickAddFolder', 'energy');
+		(app.vault as any).getFolderByPath = (path: string) => (path === 'energy' ? { path, name: 'energy' } : null);
+		(app.vault as any).getAbstractFileByPath = (): null => null;
+
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+		(view as any).createFileForView = async (
+			baseFileName: string,
+			frontmatterProcessor?: (frontmatter: Record<string, unknown>) => void,
+		) => {
+			const frontmatter: Record<string, unknown> = {};
+			frontmatterProcessor?.(frontmatter);
+			(view as any).createFileForViewCalls.push({ baseFileName, frontmatter });
+			(app.vault as any).emit('create', attachment);
+			(app.vault as any).emit('create', createdFile);
+		};
+
+		await (view as any).createQuickAddCard('New Task', 'Doing', null);
+
+		// Already in the target folder, so nothing to move — and definitely not
+		// the .png.
+		assert.deepStrictEqual(app.fileManager.renameFile.calls, []);
 	});
 
 	test('quick add closes the native Base new item popover', async () => {
@@ -4728,22 +4795,30 @@ describe('Rename sync', () => {
 	test('recoverStalePath returns existing paths unchanged', () => {
 		const view = buildView();
 		const files = app.vault.getMarkdownFiles();
-		files.push({ path: 'dir/01-Ann-PM.md', name: '01-Ann-PM.md', parent: { path: 'dir' } });
+		files.push(createMockTFile('dir/01-Ann-PM.md'));
 		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM.md');
 	});
 
 	test('recoverStalePath repairs a stale path via unique hyphen-prefix match', () => {
 		const view = buildView();
 		const files = app.vault.getMarkdownFiles();
-		files.push({ path: 'dir/01-Ann-PM-lion24.md', name: '01-Ann-PM-lion24.md', parent: { path: 'dir' } });
+		files.push(createMockTFile('dir/01-Ann-PM-lion24.md'));
 		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM-lion24.md');
+	});
+
+	test('recoverStalePath only looks inside the stale path own folder', () => {
+		const view = buildView();
+		const files = app.vault.getMarkdownFiles();
+		// Same prefix, wrong folder: scanning the whole vault would "recover" it.
+		files.push(createMockTFile('other/01-Ann-PM-lion24.md'));
+		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM.md');
 	});
 
 	test('recoverStalePath keeps the stale path when the prefix match is ambiguous', () => {
 		const view = buildView();
 		const files = app.vault.getMarkdownFiles();
-		files.push({ path: 'dir/01-Ann-PM-lion.md', name: '01-Ann-PM-lion.md', parent: { path: 'dir' } });
-		files.push({ path: 'dir/01-Ann-PA-crab.md', name: '01-Ann-PA-crab.md', parent: { path: 'dir' } });
+		files.push(createMockTFile('dir/01-Ann-PM-lion.md'));
+		files.push(createMockTFile('dir/01-Ann-PA-crab.md'));
 		assert.strictEqual((view as any).recoverStalePath('dir/01-Ann-PM.md'), 'dir/01-Ann-PM.md');
 	});
 });
@@ -4815,6 +4890,65 @@ describe('Unconfigured view foolproofing', () => {
 		clickToggle();
 		assert.strictEqual(view.containerEl.querySelector('.obk-masonry-board'), null, 'toggle off: masonry cleared');
 		assert.ok(view.containerEl.querySelectorAll('.obk-column').length > 0, 'kanban columns are back');
+	});
+
+	// The card wall used to be a CSS multi-column block (column-count), which
+	// store review flags as only partially supported. It is now real flex
+	// columns filled by _distributeMasonry; jsdom reports every height as 0, so
+	// these exercise the round-robin fallback path.
+	describe('Masonry column layout', () => {
+		function renderMasonry(columns?: number) {
+			controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
+			controller.app = app;
+			controller.config.set('masonryMode', true);
+			if (columns !== undefined) controller.config.set('masonryColumns', columns);
+			const view = new KanbanView(controller, scrollEl);
+			setupKanbanViewWithApp(view, app);
+			triggerDataUpdate(view);
+			return view;
+		}
+
+		const cardPaths = (el: Element) =>
+			Array.from(el.querySelectorAll('.obk-card')).map((card) => card.getAttribute('data-entry-path'));
+
+		test('cards are spread across flex columns, never a multi-column block', () => {
+			const view = renderMasonry(4);
+			const board = view.containerEl.querySelector('.obk-masonry-board');
+			assert.ok(board, 'masonry board renders');
+			const columns = board.querySelectorAll('.obk-masonry-col');
+			assert.strictEqual(columns.length, 4, 'one element per configured column');
+			// Every card sits inside a column, exactly once.
+			assert.strictEqual(
+				Array.from(columns).reduce((sum, col) => sum + col.querySelectorAll('.obk-card').length, 0),
+				5,
+			);
+			assert.deepStrictEqual(cardPaths(board), ['Task 1.md', 'Task 5.md', 'Task 2.md', 'Task 3.md', 'Task 4.md']);
+			assert.deepStrictEqual(cardPaths(columns[0]), ['Task 1.md', 'Task 5.md'], 'round-robin wraps to column 0');
+			assert.deepStrictEqual(cardPaths(columns[3]), ['Task 4.md']);
+		});
+
+		test('column count follows the masonryColumns option', () => {
+			const view = renderMasonry(2);
+			const columns = view.containerEl.querySelectorAll('.obk-masonry-col');
+			assert.strictEqual(columns.length, 2);
+			assert.deepStrictEqual(cardPaths(columns[0]), ['Task 1.md', 'Task 3.md', 'Task 5.md']);
+			assert.deepStrictEqual(cardPaths(columns[1]), ['Task 2.md', 'Task 4.md']);
+		});
+
+		test('out-of-range column counts are clamped, not trusted', () => {
+			assert.strictEqual(renderMasonry(99).containerEl.querySelectorAll('.obk-masonry-col').length, 12);
+			assert.strictEqual(renderMasonry(1).containerEl.querySelectorAll('.obk-masonry-col').length, 2);
+		});
+
+		test('closing the view tears down the masonry resize observer', () => {
+			const view = renderMasonry(3);
+			let disconnected = 0;
+			(view as any)._masonryResizeObserver = { disconnect: () => disconnected++ };
+			view.onClose();
+			assert.strictEqual(disconnected, 1, 'observer disconnected on close');
+			assert.strictEqual((view as any)._masonryResizeObserver, null);
+			assert.deepStrictEqual((view as any)._masonryCards, [], 'card references released');
+		});
 	});
 
 	test('Fresh view auto-inherits the first configured sibling view', async () => {

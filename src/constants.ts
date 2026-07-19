@@ -222,8 +222,9 @@ export const CSS_CLASSES = {
 	MINIMAL_TOGGLE_ICON: 'obk-minimal-toggle-icon',
 	MINIMAL_TOGGLE_ACTIVE: 'obk-minimal-toggle--active',
 
-	// Masonry (flow) mode: cards flow in a CSS column-count grid, no groupBy columns.
+	// Masonry (flow) mode: cards fill equal-width flex columns, no groupBy columns.
 	MASONRY_BOARD: 'obk-masonry-board',
+	MASONRY_COLUMN: 'obk-masonry-col',
 	MASONRY_TOGGLE: 'obk-masonry-toggle',
 	MASONRY_TOGGLE_ICON: 'obk-masonry-toggle-icon',
 	MASONRY_TOGGLE_ACTIVE: 'obk-masonry-toggle--active',
@@ -250,6 +251,9 @@ export const SORTABLE_CONFIG = {
 
 /** Debounce delay in ms for onDataUpdated renders */
 export const DEBOUNCE_DELAY = 50;
+
+/** Debounce delay in ms before re-balancing masonry columns after a pane resize */
+export const MASONRY_REBALANCE_DELAY = 120;
 
 /** Empty state messages */
 export const EMPTY_STATE_MESSAGES = {
