@@ -1,4 +1,4 @@
-import { type App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
+import { type App, PluginSettingTab, Setting, type SettingDefinitionItem, normalizePath } from 'obsidian';
 import { DEFAULT_DEMO_FOLDER } from './demo.ts';
 import { t } from './i18n/index.ts';
 import { isRecord } from './kanbanView.ts';
@@ -33,6 +33,42 @@ export class KanbanSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	/**
+	 * Declarative settings (Obsidian 1.13+). Returning a non-empty array makes
+	 * Obsidian render the tab from these definitions and index them for
+	 * settings search; display() below is never called there.
+	 */
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				name: t('settings.demoFolder.name'),
+				desc: t('settings.demoFolder.desc'),
+				control: {
+					type: 'folder',
+					key: 'demoFolder',
+					placeholder: DEFAULT_SETTINGS.demoFolder,
+					defaultValue: DEFAULT_SETTINGS.demoFolder,
+				},
+			},
+		];
+	}
+
+	/**
+	 * The default implementation writes the raw input straight to
+	 * plugin.settings. Route it through the same normalization display() uses so
+	 * an empty or unnormalized folder can never reach create/remove demo board.
+	 */
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		// demoFolder is the only declared control; deliberately no super call, so
+		// nothing here touches an API that Obsidian 1.10.2 (our minAppVersion)
+		// does not have.
+		if (key !== 'demoFolder') return;
+		const raw = typeof value === 'string' ? value.trim() : '';
+		this.plugin.settings.demoFolder = raw ? normalizePath(raw) : DEFAULT_SETTINGS.demoFolder;
+		await this.plugin.saveSettings();
+	}
+
+	/** Fallback for Obsidian older than 1.13.0, which has no declarative settings. */
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();

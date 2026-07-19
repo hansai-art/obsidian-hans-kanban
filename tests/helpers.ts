@@ -157,6 +157,31 @@ if (!DocumentProto.createEl) {
 	};
 }
 
+// Obsidian exposes the owning window as `node.win` / `doc.win`, and mirrors the
+// detached element factories onto every window it owns (including pop-outs).
+if (!Object.getOwnPropertyDescriptor(DocumentProto, 'win')) {
+	Object.defineProperty(DocumentProto, 'win', {
+		get: function () {
+			return this.defaultView;
+		},
+	});
+}
+
+if (!Object.getOwnPropertyDescriptor(HTMLElementProto, 'win')) {
+	Object.defineProperty(HTMLElementProto, 'win', {
+		get: function () {
+			return this.ownerDocument?.defaultView;
+		},
+	});
+}
+
+for (const method of ['createDiv', 'createSpan', 'createEl'] as const) {
+	const windowTarget = dom.window as any;
+	if (!windowTarget[method]) {
+		windowTarget[method] = DocumentProto[method].bind(dom.window.document);
+	}
+}
+
 const EventProto = dom.window.Event.prototype as any;
 
 if (!EventProto.instanceOf) {

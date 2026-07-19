@@ -217,7 +217,7 @@ export function createAddButton(
 	ctx: QuickAddCtx,
 	cb: QuickAddCallbacks,
 ): HTMLElement {
-	const btn = ctx.doc.createElement('div');
+	const btn = ctx.doc.win.createDiv();
 	btn.className = CSS_CLASSES.COLUMN_ADD_BTN;
 	btn.setAttribute(
 		'aria-label',

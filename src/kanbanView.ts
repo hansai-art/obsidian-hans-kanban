@@ -1,5 +1,6 @@
 import type {
 	App,
+	BasesAllOptions,
 	BasesEntry,
 	BasesPropertyId,
 	BasesViewConfig,
@@ -7,7 +8,6 @@ import type {
 	EventRef,
 	HoverPopover,
 	QueryController,
-	ViewOption,
 } from 'obsidian';
 import { BasesView, Keymap, Notice, Value, normalizePath, parsePropertyId } from 'obsidian';
 import { ToolbarToggleGroup } from './toolbar.ts';
@@ -2260,7 +2260,7 @@ export class KanbanView extends BasesView {
 		this.activeColorPicker?.remove();
 		this.activeColorPicker = null;
 
-		const popover = anchorEl.doc.createElement('div');
+		const popover = anchorEl.doc.win.createDiv();
 		popover.className = CSS_CLASSES.COLUMN_COLOR_POPOVER;
 
 		// Single teardown path: removes the popover AND the document-level dismiss
@@ -2274,7 +2274,7 @@ export class KanbanView extends BasesView {
 
 		const currentColor = columnEl.getAttribute(DATA_ATTRIBUTES.COLUMN_COLOR);
 
-		const noneSwatch = anchorEl.doc.createElement('div');
+		const noneSwatch = anchorEl.doc.win.createDiv();
 		noneSwatch.className = `${CSS_CLASSES.COLUMN_COLOR_SWATCH} ${CSS_CLASSES.COLUMN_COLOR_NONE}`;
 		if (!currentColor) noneSwatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
 		noneSwatch.title = t('label.noColor');
@@ -2287,7 +2287,7 @@ export class KanbanView extends BasesView {
 		popover.appendChild(noneSwatch);
 
 		for (const color of COLOR_PALETTE) {
-			const swatch = anchorEl.doc.createElement('div');
+			const swatch = anchorEl.doc.win.createDiv();
 			swatch.className = CSS_CLASSES.COLUMN_COLOR_SWATCH;
 			swatch.style.background = color.cssVar;
 			swatch.title = color.name;
@@ -2326,7 +2326,7 @@ export class KanbanView extends BasesView {
 		this.activeColorPicker = null;
 		if (!value) return;
 
-		const popover = anchorEl.doc.createElement('div');
+		const popover = anchorEl.doc.win.createDiv();
 		popover.className = CSS_CLASSES.COLUMN_COLOR_POPOVER;
 		const leadEmoji = [...value][0] ?? '';
 		const currentColor = EMOJI_COLOR_MAP[leadEmoji] ?? this._cardColorPrefs[value] ?? null;
@@ -2352,7 +2352,7 @@ export class KanbanView extends BasesView {
 			void Promise.all(targets.map((e) => this.setCardProperty(e, propertyId, newValue)));
 		};
 
-		const noneSwatch = anchorEl.doc.createElement('div');
+		const noneSwatch = anchorEl.doc.win.createDiv();
 		noneSwatch.className = `${CSS_CLASSES.COLUMN_COLOR_SWATCH} ${CSS_CLASSES.COLUMN_COLOR_NONE}`;
 		if (!currentColor) noneSwatch.classList.add(CSS_CLASSES.COLUMN_COLOR_SWATCH_ACTIVE);
 		noneSwatch.title = t('label.noColor');
@@ -2360,7 +2360,7 @@ export class KanbanView extends BasesView {
 		popover.appendChild(noneSwatch);
 
 		for (const color of COLOR_PALETTE) {
-			const swatch = anchorEl.doc.createElement('div');
+			const swatch = anchorEl.doc.win.createDiv();
 			swatch.className = CSS_CLASSES.COLUMN_COLOR_SWATCH;
 			swatch.style.background = color.cssVar;
 			swatch.title = color.name;
@@ -2835,7 +2835,10 @@ export class KanbanView extends BasesView {
 	 * and the file simply becomes stale once each base has migrated its own state.
 	 */
 
-	static getViewOptions(this: void): ViewOption[] {
+	// Bases passes the view config to this factory (BasesViewRegistration.options).
+	// Take it here and close over it: as of Obsidian 1.13 `shouldHide` is called
+	// with no arguments, so reading the config from a shouldHide parameter throws.
+	static getViewOptions(this: void, config: BasesViewConfig): BasesAllOptions[] {
 		return [
 			{
 				displayName: t('option.groupBy'),
@@ -2874,7 +2877,7 @@ export class KanbanView extends BasesView {
 				displayName: t('option.cardColorOrder'),
 				type: 'multitext',
 				key: 'cardColorOrder',
-				shouldHide: (config: BasesViewConfig) => !config.getAsPropertyId('cardColorProperty'),
+				shouldHide: () => !config.getAsPropertyId('cardColorProperty'),
 			},
 			{
 				displayName: t('option.imageProperty'),

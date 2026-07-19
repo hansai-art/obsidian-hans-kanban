@@ -2,7 +2,7 @@
 // This provides the minimal interface needed for tests
 
 export type BasesPropertyId = string;
-export type ViewOption = any;
+export type BasesAllOptions = any;
 
 // Real classes: TAbstractFile → TFile / TFolder. Classes (not interfaces) so
 // production `instanceof TFile` checks work under test; object literals cast
@@ -164,6 +164,9 @@ export class Plugin {
 		// Mock implementation
 	}
 }
+
+/** Declarative settings definitions (Obsidian 1.13+). Shape-checked in tests. */
+export type SettingDefinitionItem = any;
 
 export class PluginSettingTab {
 	app: App;

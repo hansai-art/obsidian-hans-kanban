@@ -152,8 +152,13 @@ describe('Legacy Data Parsing', () => {
 });
 
 describe('View Options', () => {
+	// Bases hands the view config to the options factory. Anything shouldHide
+	// needs must be closed over from here, never taken as a parameter.
+	const stubConfig = (propertyIds: Record<string, string | null> = {}) =>
+		({ getAsPropertyId: (key: string) => propertyIds[key] ?? null }) as any;
+
 	test('getViewOptions returns correct structure', () => {
-		const options = KanbanView.getViewOptions();
+		const options = KanbanView.getViewOptions(stubConfig());
 
 		const byKey = Object.fromEntries(options.map((o) => [(o as { key: string }).key, o])) as Record<string, any>;
 
@@ -191,8 +196,24 @@ describe('View Options', () => {
 		assert.strictEqual(byKey.quickAddFolder.type, 'folder');
 	});
 
+	// Regression: Obsidian 1.13 calls shouldHide() with no arguments. Reading
+	// the config from a shouldHide parameter throws there.
+	test('shouldHide reads the factory config, not its own arguments', () => {
+		const findColorOrder = (config: any) =>
+			KanbanView.getViewOptions(config).find((o) => (o as { key?: string }).key === 'cardColorOrder') as {
+				shouldHide?: () => boolean;
+			};
+
+		const hidden = findColorOrder(stubConfig());
+		assert.ok(hidden?.shouldHide, 'cardColorOrder should declare shouldHide');
+		assert.strictEqual(hidden.shouldHide(), true, 'hidden when no card-color property is set');
+
+		const shown = findColorOrder(stubConfig({ cardColorProperty: 'note.status' }));
+		assert.strictEqual(shown.shouldHide?.(), false, 'shown once a card-color property is set');
+	});
+
 	test('Property filter excludes file.* properties', () => {
-		const options = KanbanView.getViewOptions();
+		const options = KanbanView.getViewOptions(stubConfig());
 		const option = options[0] as { filter?: (prop: string) => boolean };
 		const filter = option.filter;
 
