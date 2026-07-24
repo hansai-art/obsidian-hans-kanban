@@ -1946,13 +1946,16 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * Spread `_masonryCards` across `_masonryColumnEls`, always appending the
-	 * next card to whichever column is currently shortest. Card heights are
-	 * measurable up front because cover images carry a fixed aspect-ratio, so
-	 * one measurement pass is enough — no reflow on image load.
+	 * Spread `_masonryCards` across `_masonryColumnEls` in reading order:
+	 * card N goes to column N % cols, so the cards flow strictly left-to-right,
+	 * top-to-bottom in their sorted order.
 	 *
-	 * Falls back to round-robin when every height reads 0 (detached board, or
-	 * jsdom under test) so the distribution stays deterministic either way.
+	 * Height-balanced ("shortest column") packing was removed on purpose: on a
+	 * ranked board it scatters the already-sorted cards across columns so the
+	 * layout no longer reads in rank order (a #2 card could land bottom-right).
+	 * Round-robin keeps the sort visible; the only trade-off is a possibly
+	 * ragged bottom edge, which is acceptable. Placement is height-independent,
+	 * so no measurement pass and no reflow on image load are needed.
 	 */
 	private _distributeMasonry(): void {
 		const cards = this._masonryCards;
@@ -1961,16 +1964,8 @@ export class KanbanView extends BasesView {
 
 		this._masonryBalancing = true;
 		try {
-			const heights = cards.map((card) => card.offsetHeight);
-			const measured = heights.some((height) => height > 0);
-			const totals = new Array<number>(columnEls.length).fill(0);
 			cards.forEach((card, index) => {
-				let target = index % columnEls.length;
-				if (measured) {
-					target = totals.indexOf(Math.min(...totals));
-					totals[target] += heights[index];
-				}
-				columnEls[target].appendChild(card);
+				columnEls[index % columnEls.length].appendChild(card);
 			});
 		} finally {
 			this._masonryBalancing = false;

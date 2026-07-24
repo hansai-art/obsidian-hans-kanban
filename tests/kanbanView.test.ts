@@ -4949,6 +4949,32 @@ describe('Unconfigured view foolproofing', () => {
 			assert.strictEqual((view as any)._masonryResizeObserver, null);
 			assert.deepStrictEqual((view as any)._masonryCards, [], 'card references released');
 		});
+
+		// Regression: reading order (left-to-right, top-to-bottom) must hold even
+		// when a real browser reports non-zero, unequal card heights. Placement is
+		// pure round-robin (card N -> column N % cols); the old height-balanced
+		// "shortest column" packing scattered the sorted cards and is gone. With
+		// Task 1 much taller, shortest-column packing would pull Task 5 into a
+		// shorter column instead of column 0, so this locks the behavior.
+		test('reading order holds when cards report unequal heights', () => {
+			const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
+			const original = Object.getOwnPropertyDescriptor(proto, 'offsetHeight');
+			Object.defineProperty(proto, 'offsetHeight', {
+				configurable: true,
+				get(this: HTMLElement) {
+					return this.getAttribute?.('data-entry-path') === 'Task 1.md' ? 500 : 10;
+				},
+			});
+			try {
+				const view = renderMasonry(4);
+				const columns = view.containerEl.querySelectorAll('.obk-masonry-col');
+				assert.deepStrictEqual(cardPaths(columns[0]), ['Task 1.md', 'Task 5.md'], 'round-robin, not shortest-column');
+				assert.deepStrictEqual(cardPaths(columns[1]), ['Task 2.md']);
+			} finally {
+				if (original) Object.defineProperty(proto, 'offsetHeight', original);
+				else delete proto.offsetHeight;
+			}
+		});
 	});
 
 	test('Fresh view auto-inherits the first configured sibling view', async () => {
