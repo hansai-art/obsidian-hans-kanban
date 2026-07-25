@@ -61,6 +61,8 @@ export const EMOJI_COLOR_MAP: Record<string, ColorName> = {
 	'🤎': 'brown',
 	'🖤': 'gray',
 	'🤍': 'gray',
+	'⚪': 'gray',
+	'⚫': 'gray',
 };
 
 /**
@@ -93,6 +95,8 @@ export const EMOJI_CHOICES: ReadonlyArray<{ emoji: string; color: ColorName }> =
 	{ emoji: '🩶', color: 'gray' },
 	{ emoji: '🖤', color: 'gray' },
 	{ emoji: '🤍', color: 'gray' },
+	{ emoji: '⚪', color: 'gray' },
+	{ emoji: '⚫', color: 'gray' },
 ];
 
 /** Inverse of EMOJI_COLOR_MAP: palette color name → leading dot emoji. */

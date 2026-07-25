@@ -4644,6 +4644,27 @@ describe('Card Color - auto-color and custom override', () => {
 		assert.strictEqual(app.fileManager.processFrontMatter.calls.length, 0, 'value with a color emoji is not rewritten');
 	});
 
+	// Regression: ⚪/⚫ circles are legitimate status dots but were missing from
+	// EMOJI_COLOR_MAP, so the guard did not recognize them as "already colored"
+	// and auto-color prepended a second dot -> "🔵 ⚪ 已有正職". They must now be
+	// treated as colored and left untouched.
+	test('global auto-color treats ⚪/⚫ circles as already-colored (no double-dot)', async () => {
+		makeRenderedView();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		const ref: any = registerGlobalAutoColor(app);
+		for (const value of ['⚪ 已有正職', '⚫ Archived']) {
+			app.fileManager.processFrontMatter.calls.length = 0;
+			await ref.callback({ path: 'Task 1.md' }, null, { frontmatter: { status: value } });
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			assert.strictEqual(
+				app.fileManager.processFrontMatter.calls.length,
+				0,
+				`white/black circle "${value}" must be recognized as colored, not re-prefixed`,
+			);
+		}
+	});
+
 	test('setCardProperty auto-prepends a palette emoji for an emoji-less value', async () => {
 		const view = makeRenderedView();
 
