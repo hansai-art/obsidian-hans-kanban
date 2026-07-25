@@ -208,6 +208,9 @@ export const CSS_CLASSES = {
 	// native Bases toolbar (canvas stays clean); floating fallback if not found.
 	TOOLBAR_TOGGLES: 'obk-toolbar-toggles',
 	TOOLBAR_TOGGLES_FLOATING: 'obk-toolbar-toggles--floating',
+	// Hides a single toggle whose spec.visible() is currently false (e.g. the
+	// flow-direction toggle only makes sense while masonry mode is on).
+	TOOLBAR_TOGGLE_HIDDEN: 'obk-toolbar-toggle--hidden',
 
 	// Onboarding empty state (unconfigured view) + config warnings.
 	ONBOARDING: 'obk-onboarding',
@@ -228,6 +231,10 @@ export const CSS_CLASSES = {
 	MASONRY_TOGGLE: 'obk-masonry-toggle',
 	MASONRY_TOGGLE_ICON: 'obk-masonry-toggle-icon',
 	MASONRY_TOGGLE_ACTIVE: 'obk-masonry-toggle--active',
+	// Flow-direction toggle (masonry only): 左到右 row-major vs 上到下 column-major.
+	MASONRY_DIR_TOGGLE: 'obk-masonry-dir-toggle',
+	MASONRY_DIR_TOGGLE_ICON: 'obk-masonry-dir-toggle-icon',
+	MASONRY_DIR_TOGGLE_ACTIVE: 'obk-masonry-dir-toggle--active',
 
 	// Quick add modal
 	QUICK_ADD_FORM: 'obk-quick-add-form',

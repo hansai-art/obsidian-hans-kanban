@@ -28,6 +28,7 @@ export const COPYABLE_KEYS: readonly string[] = [
 	'columnColors',
 	'columnOrders',
 	'masonryMode',
+	'masonryColumnFirst',
 	'masonryColumns',
 	'masonrySortProperty',
 	'minimalMode',

@@ -41,6 +41,8 @@ export const en = {
 	'label.minimalShort': 'Minimal',
 	'label.masonryMode': 'Flow mode (masonry grid)',
 	'label.masonryShort': 'Flow',
+	'label.masonryDir': 'Flow direction (left-to-right vs top-to-bottom)',
+	'label.masonryDirShort': 'Direction',
 	'notice.sortedCardOrder': '⚠️ Sort is active. Clear it to manually reorder cards within a column.',
 	'empty.noEntries': 'No entries found. Add some notes to your base.',
 	'empty.noProperties': 'No properties found in entries.',

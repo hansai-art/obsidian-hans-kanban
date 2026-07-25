@@ -688,6 +688,13 @@ export class KanbanView extends BasesView {
 	/** Like _minimalModeDirty, but for masonryMode. Flushed on close. */
 	private _masonryModeDirty = false;
 	private _masonryMode = false;
+	/**
+	 * Flow direction inside masonry: false = 左到右 (row-major, card N → column
+	 * N % cols); true = 上到下 (column-major, fill column 0 top-to-bottom first).
+	 * Persisted like masonryMode (deferred to close to avoid a host rebuild flash).
+	 */
+	private _masonryColumnFirstDirty = false;
+	private _masonryColumnFirst = false;
 	private _lastMasonryEntriesKey = '';
 	/** Card elements currently laid out in the masonry board, in sorted order. */
 	private _masonryCards: HTMLElement[] = [];
@@ -784,6 +791,7 @@ export class KanbanView extends BasesView {
 		// here would silently revert the toggle on the very render it triggered.
 		if (!this._minimalModeDirty) this._minimalMode = this.config.get('minimalMode') === true;
 		if (!this._masonryModeDirty) this._masonryMode = this.config.get('masonryMode') === true;
+		if (!this._masonryColumnFirstDirty) this._masonryColumnFirst = this.config.get('masonryColumnFirst') === true;
 	}
 
 	/**
@@ -1050,6 +1058,10 @@ export class KanbanView extends BasesView {
 				this._masonryModeDirty = false;
 				this.config?.set('masonryMode', this._masonryMode);
 			}
+			if (this._masonryColumnFirstDirty) {
+				this._masonryColumnFirstDirty = false;
+				this.config?.set('masonryColumnFirst', this._masonryColumnFirst);
+			}
 			if (this._prefsDirty && this._prefsPropertyId) {
 				this._prefsDirty = false;
 				const swimlaneScopedKey = this._prefsSwimlanePropertyId
@@ -1181,6 +1193,7 @@ export class KanbanView extends BasesView {
 				const entriesKey =
 					entries.map((e) => e.file.path).join('\0') +
 					`|${cols}` +
+					`|dir:${this._masonryColumnFirst ? 'col' : 'row'}` +
 					(colorPropId ? `|${entries.map((e) => String(e.getValue(colorPropId) ?? '')).join('\0')}` : '') +
 					(sortPropId ? `|sort:${entries.map((e) => String(e.getValue(sortPropId) ?? '')).join('\0')}` : '');
 				if (
@@ -1946,16 +1959,21 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * Spread `_masonryCards` across `_masonryColumnEls` in reading order:
-	 * card N goes to column N % cols, so the cards flow strictly left-to-right,
-	 * top-to-bottom in their sorted order.
+	 * Spread `_masonryCards` across `_masonryColumnEls` in reading order. Two
+	 * directions, selected by `_masonryColumnFirst`:
+	 *
+	 * - 左到右 (row-major, default): card N → column N % cols. Reading across a
+	 *   row then down; the first `cols` cards form the top row.
+	 * - 上到下 (column-major): fill column 0 fully top-to-bottom, then column 1…
+	 *   card N → column floor(N / ceil(total / cols)). The highest-ranked cards
+	 *   stack down the left edge.
 	 *
 	 * Height-balanced ("shortest column") packing was removed on purpose: on a
 	 * ranked board it scatters the already-sorted cards across columns so the
 	 * layout no longer reads in rank order (a #2 card could land bottom-right).
-	 * Round-robin keeps the sort visible; the only trade-off is a possibly
-	 * ragged bottom edge, which is acceptable. Placement is height-independent,
-	 * so no measurement pass and no reflow on image load are needed.
+	 * Both directions here keep the sort visible; the only trade-off is a
+	 * possibly ragged bottom edge, which is acceptable. Placement is
+	 * height-independent, so no measurement pass and no reflow on image load.
 	 */
 	private _distributeMasonry(): void {
 		const cards = this._masonryCards;
@@ -1964,9 +1982,17 @@ export class KanbanView extends BasesView {
 
 		this._masonryBalancing = true;
 		try {
-			cards.forEach((card, index) => {
-				columnEls[index % columnEls.length].appendChild(card);
-			});
+			if (this._masonryColumnFirst) {
+				const rowsPerCol = Math.ceil(cards.length / columnEls.length);
+				cards.forEach((card, index) => {
+					const col = Math.min(columnEls.length - 1, Math.floor(index / rowsPerCol));
+					columnEls[col].appendChild(card);
+				});
+			} else {
+				cards.forEach((card, index) => {
+					columnEls[index % columnEls.length].appendChild(card);
+				});
+			}
 		} finally {
 			this._masonryBalancing = false;
 		}
@@ -2095,6 +2121,23 @@ export class KanbanView extends BasesView {
 							this._teardownMasonryObserver();
 							this.containerEl.empty();
 						}
+						this._debouncedRender();
+					},
+				},
+				{
+					cssClass: CSS_CLASSES.MASONRY_DIR_TOGGLE,
+					iconClass: CSS_CLASSES.MASONRY_DIR_TOGGLE_ICON,
+					activeClass: CSS_CLASSES.MASONRY_DIR_TOGGLE_ACTIVE,
+					label: () => t('label.masonryDir'),
+					text: () => t('label.masonryDirShort'),
+					// active = 上到下 (column-major) → vertical glyph; else 左到右.
+					icon: (active) => (active ? 'move-vertical' : 'move-horizontal'),
+					isActive: () => this._masonryColumnFirst,
+					// Only relevant while the flow board is on screen.
+					visible: () => this._masonryMode,
+					onToggle: () => {
+						this._masonryColumnFirst = !this._masonryColumnFirst;
+						this._masonryColumnFirstDirty = true;
 						this._debouncedRender();
 					},
 				},

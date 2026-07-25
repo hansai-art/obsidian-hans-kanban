@@ -14,6 +14,8 @@ export interface ToolbarToggleSpec {
 	icon: (active: boolean) => string;
 	isActive: () => boolean;
 	onToggle: () => void;
+	/** Optional gate: when it returns false the button is hidden (not removed). */
+	visible?: () => boolean;
 }
 
 /**
@@ -79,6 +81,7 @@ export class ToolbarToggleGroup {
 		for (const [spec, btn] of this.buttons) {
 			const active = spec.isActive();
 			btn.classList.toggle(spec.activeClass, active);
+			btn.classList.toggle(CSS_CLASSES.TOOLBAR_TOGGLE_HIDDEN, spec.visible ? !spec.visible() : false);
 			const iconEl = btn.querySelector<HTMLElement>(`.${spec.iconClass}`);
 			if (iconEl) setIcon(iconEl, spec.icon(active));
 			btn.setAttribute('aria-pressed', String(active));

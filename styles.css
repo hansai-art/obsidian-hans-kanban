@@ -52,14 +52,23 @@
 }
 
 .obk-minimal-toggle-icon,
-.obk-masonry-toggle-icon {
+.obk-masonry-toggle-icon,
+.obk-masonry-dir-toggle-icon {
 	display: inline-flex;
 	align-items: center;
 }
 
 .obk-minimal-toggle--active,
-.obk-masonry-toggle--active {
+.obk-masonry-toggle--active,
+.obk-masonry-dir-toggle--active {
 	color: var(--text-accent);
+}
+
+/* A single toggle hidden by its spec.visible() gate (e.g. flow-direction is
+   only shown while masonry mode is on). Higher specificity than the base
+   .text-icon-button display so it wins without !important. */
+.obk-toolbar-toggles .text-icon-button.obk-toolbar-toggle--hidden {
+	display: none;
 }
 
 /* Fallback only: the whole group floats in the board's top-right corner if

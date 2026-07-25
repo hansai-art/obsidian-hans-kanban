@@ -4897,10 +4897,11 @@ describe('Unconfigured view foolproofing', () => {
 	// columns filled by _distributeMasonry; jsdom reports every height as 0, so
 	// these exercise the round-robin fallback path.
 	describe('Masonry column layout', () => {
-		function renderMasonry(columns?: number) {
+		function renderMasonry(columns?: number, columnFirst = false) {
 			controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
 			controller.app = app;
 			controller.config.set('masonryMode', true);
+			if (columnFirst) controller.config.set('masonryColumnFirst', true);
 			if (columns !== undefined) controller.config.set('masonryColumns', columns);
 			const view = new KanbanView(controller, scrollEl);
 			setupKanbanViewWithApp(view, app);
@@ -4933,6 +4934,31 @@ describe('Unconfigured view foolproofing', () => {
 			assert.strictEqual(columns.length, 2);
 			assert.deepStrictEqual(cardPaths(columns[0]), ['Task 1.md', 'Task 3.md', 'Task 5.md']);
 			assert.deepStrictEqual(cardPaths(columns[1]), ['Task 2.md', 'Task 4.md']);
+		});
+
+		// 上到下為主 (column-major): fill column 0 top-to-bottom, then column 1…
+		// card N -> column floor(N / ceil(total / cols)). Sort order is Task 1..5.
+		// With 5 cards / 2 cols, ceil(5/2)=3 rows per column, so col0 takes the
+		// first three in sort order and col1 the rest — the opposite grouping to
+		// row-major's col0=[1,3,5].
+		test('column-first flow fills each column top-to-bottom', () => {
+			const view = renderMasonry(2, true);
+			const columns = view.containerEl.querySelectorAll('.obk-masonry-col');
+			assert.strictEqual(columns.length, 2);
+			assert.deepStrictEqual(cardPaths(columns[0]), ['Task 1.md', 'Task 2.md', 'Task 3.md']);
+			assert.deepStrictEqual(cardPaths(columns[1]), ['Task 4.md', 'Task 5.md']);
+		});
+
+		// With more columns than a full last row needs, the trailing columns stay
+		// empty rather than the placement overflowing past the last column.
+		test('column-first leaves trailing columns empty when cards run out', () => {
+			const view = renderMasonry(4, true);
+			const columns = view.containerEl.querySelectorAll('.obk-masonry-col');
+			// 5 cards / 4 cols -> ceil(5/4)=2 rows per column.
+			assert.deepStrictEqual(cardPaths(columns[0]), ['Task 1.md', 'Task 2.md']);
+			assert.deepStrictEqual(cardPaths(columns[1]), ['Task 3.md', 'Task 4.md']);
+			assert.deepStrictEqual(cardPaths(columns[2]), ['Task 5.md']);
+			assert.deepStrictEqual(cardPaths(columns[3]), [], 'no overflow into the trailing column');
 		});
 
 		test('out-of-range column counts are clamped, not trusted', () => {
