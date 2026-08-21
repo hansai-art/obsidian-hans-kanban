@@ -128,11 +128,11 @@
 
 **每日工作台（推薦）**：以時間安排今天、這週、這月與本季工作。
 
-![每日工作台：以時間分欄，每欄至少兩張示範卡片](assets/daily-workbench.png)
+![每日工作台：以時間分欄，每欄至少兩張示範卡片](https://raw.githubusercontent.com/hansai-art/obsidian-hans-kanban/main/assets/daily-workbench.png)
 
 **專案進度看板**：以狀態追蹤從未開始到完成的交付進度。
 
-![專案進度看板：以狀態分欄，每欄至少兩張示範卡片](assets/project-progress-board.png)
+![專案進度看板：以狀態分欄，每欄至少兩張示範卡片](https://raw.githubusercontent.com/hansai-art/obsidian-hans-kanban/main/assets/project-progress-board.png)
 
 ## 資料存取範圍
 
