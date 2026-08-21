@@ -5024,7 +5024,7 @@ describe('Unconfigured view foolproofing', () => {
 		});
 	});
 
-	test('Fresh view auto-inherits the first configured sibling view', async () => {
+	test('Fresh view waits for the user to choose a template', async () => {
 		controller = createMockQueryController(createEntriesWithStatus(), TEST_PROPERTIES);
 		controller.app = app;
 		app.workspace.getActiveFile = () => ({ extension: 'base', path: 'board.base' });
@@ -5044,9 +5044,9 @@ describe('Unconfigured view foolproofing', () => {
 		triggerDataUpdate(view);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		assert.strictEqual(controller.config.get('groupByProperty'), PROPERTY_STATUS);
-		assert.strictEqual(controller.config.get('cardTitleProperty'), 'note.姓名');
-		assert.strictEqual(controller.config.get('inheritedFrom'), '決策看板');
+		assert.strictEqual(controller.config.get('groupByProperty'), null);
+		assert.strictEqual(controller.config.get('cardTitleProperty'), null);
+		assert.strictEqual(controller.config.get('inheritedFrom'), null);
 	});
 
 	test('View marked inheritedFrom never re-inherits', async () => {

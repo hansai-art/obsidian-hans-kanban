@@ -18,6 +18,8 @@ export const COPYABLE_KEYS: readonly string[] = [
 	'cardTitleProperty',
 	'cardColorProperty',
 	'cardColorOrder',
+	'cardColors',
+	'cardSelectOptions',
 	'imageProperty',
 	'imageFit',
 	'imageAspectRatio',
@@ -33,6 +35,83 @@ export const COPYABLE_KEYS: readonly string[] = [
 	'masonrySortProperty',
 	'minimalMode',
 	'order',
+	'sort',
+];
+
+export interface ViewTemplate {
+	name: string;
+	description: string;
+	config: Record<string, unknown>;
+}
+
+const STATUS_ORDER = [
+	'🟤 未開始',
+	'🔴 進行中',
+	'🟡 25%',
+	'🔵 50%',
+	'🟣 75%',
+	'🩵 90%',
+	'🩷 99%',
+	'🟢 100%',
+	'⚪ 已交付',
+	'🟤 可以封存',
+];
+const STATUS_COLORS = Object.fromEntries([
+	['🟤 未開始', 'brown'],
+	['🔴 進行中', 'red'],
+	['🟡 25%', 'yellow'],
+	['🔵 50%', 'blue'],
+	['🟣 75%', 'purple'],
+	['🩵 90%', 'cyan'],
+	['🩷 99%', 'pink'],
+	['🟢 100%', 'green'],
+	['⚪ 已交付', 'gray'],
+	['🟤 可以封存', 'brown'],
+]);
+
+export const DEFAULT_VIEW_TEMPLATES: readonly ViewTemplate[] = [
+	{
+		name: '每日工作台',
+		description: '依時間安排每日優先順序',
+		config: {
+			groupByProperty: 'note.時間',
+			quickAddFolder: 'B1_個人策略/5-主線看板',
+			cardTitleProperty: 'note.目標',
+			cardColorProperty: 'note.狀態',
+			cardColorOrder: STATUS_ORDER,
+			cardSelectOptions: { 'note.優先度': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'] },
+			cardColors: { 'note.狀態': STATUS_COLORS },
+			columnOrders: { 'note.時間': ['專案列表', '今天必達', '本週目標', '本月目標', '本季目標'] },
+			columnWidth: 260,
+			wrapPropertyValues: true,
+			minimalMode: true,
+			masonryMode: false,
+			hideEmptyColumns: false,
+			order: ['優先度', '狀態', '下一步'],
+			sort: [{ property: '優先度', direction: 'DESC' }],
+		},
+	},
+	{
+		name: '專案進度看板',
+		description: '依狀態追蹤交付進度',
+		config: {
+			groupByProperty: 'note.狀態',
+			quickAddFolder: 'B1_個人策略/5-主線看板',
+			cardTitleProperty: 'note.目標',
+			cardColorProperty: 'note.狀態',
+			cardColorOrder: STATUS_ORDER,
+			cardSelectOptions: { 'note.優先度': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'] },
+			cardColors: { 'note.狀態': STATUS_COLORS },
+			columnOrders: { 'note.狀態': STATUS_ORDER },
+			columnWidth: 300,
+			wrapPropertyValues: true,
+			minimalMode: false,
+			masonryMode: false,
+			hideEmptyColumns: false,
+			order: ['優先度', '時間', '下一步'],
+			sort: [{ property: '優先度', direction: 'DESC' }],
+		},
+	},
 ];
 
 export interface SiblingViewConfig {
@@ -83,6 +162,31 @@ export function applyViewConfigCopy(config: BasesViewConfig, sibling: SiblingVie
 	}
 }
 
+export function applyViewTemplate(config: BasesViewConfig, template: ViewTemplate): void {
+	applyViewConfigCopy(config, { name: template.name, config: template.config });
+	config.set('inheritedFrom', `template:${template.name}`);
+}
+
+export class TemplatePickerModal extends FuzzySuggestModal<ViewTemplate> {
+	constructor(
+		app: App,
+		private templates: readonly ViewTemplate[],
+		private onPick: (template: ViewTemplate) => void,
+	) {
+		super(app);
+		this.setPlaceholder('選擇看板模板');
+	}
+	getItems(): ViewTemplate[] {
+		return [...this.templates];
+	}
+	getItemText(item: ViewTemplate): string {
+		return `${item.name}：${item.description}`;
+	}
+	onChooseItem(item: ViewTemplate): void {
+		this.onPick(item);
+	}
+}
+
 class GroupByPropertyModal extends FuzzySuggestModal<BasesPropertyId> {
 	constructor(
 		app: App,
@@ -126,6 +230,16 @@ export function renderOnboarding(containerEl: HTMLElement, ctx: OnboardingCtx): 
 	card.createDiv({ cls: CSS_CLASSES.ONBOARDING_TITLE, text: t('onboarding.title') });
 	card.createDiv({ cls: CSS_CLASSES.ONBOARDING_DESC, text: t('onboarding.desc') });
 	const actions = card.createDiv({ cls: CSS_CLASSES.ONBOARDING_ACTIONS });
+	for (const [index, template] of DEFAULT_VIEW_TEMPLATES.entries()) {
+		const button = actions.createEl('button', {
+			text: index === 0 ? `${template.name}（推薦）` : template.name,
+			cls: index === 0 ? 'mod-cta' : '',
+		});
+		button.addEventListener('click', () => {
+			applyViewTemplate(ctx.config, template);
+			new Notice(t('notice.copiedView').replace('{name}', template.name));
+		});
+	}
 
 	const copyBtn = actions.createEl('button', { text: t('onboarding.copyView') });
 	copyBtn.addEventListener('click', (e) => {

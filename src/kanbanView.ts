@@ -12,7 +12,7 @@ import type {
 import { BasesView, Keymap, Notice, Value, normalizePath, parsePropertyId } from 'obsidian';
 import { ToolbarToggleGroup } from './toolbar.ts';
 import { compareSortValuesDesc } from './utils/sortValue.ts';
-import { applyViewConfigCopy, readSiblingKanbanViews, renderOnboarding } from './onboarding.ts';
+import { DEFAULT_VIEW_TEMPLATES, TemplatePickerModal, applyViewTemplate, renderOnboarding } from './onboarding.ts';
 import {
 	createCard as createCardEl,
 	computeCardFingerprint,
@@ -708,8 +708,7 @@ export class KanbanView extends BasesView {
 
 	/** The .bases-view wrapper we tagged with the host class (see _ensureBasesHostClass). */
 	private _basesHostEl: HTMLElement | null = null;
-	/** One inherit attempt per session; config marker 'inheritedFrom' persists across sessions. */
-	private _inheritAttempted = false;
+
 	private _debouncedFlushPrefs: DebouncedFn<() => void>;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, legacyData: LegacyData | null = null) {
@@ -1103,8 +1102,6 @@ export class KanbanView extends BasesView {
 			this._ensureBasesHostClass();
 			const entries = this.data?.data || [];
 			const availablePropertyIds = this.allProperties || [];
-
-			this._maybeInheritSiblingConfig();
 
 			if (!this.groupByPropertyId) {
 				if (this._masonryMode && availablePropertyIds.length > 0) {
@@ -2030,34 +2027,6 @@ export class KanbanView extends BasesView {
 	}
 
 	/**
-	 * New-view template experience: a freshly created view (no group-by, no
-	 * card options at all) silently inherits the settings of the first
-	 * configured kanban view in the same base, so "+ add view" produces a
-	 * working board instead of a blank one. Runs at most once per session;
-	 * the persisted 'inheritedFrom' marker stops later sessions from
-	 * re-inheriting after the user clears settings on purpose.
-	 */
-	private _maybeInheritSiblingConfig(): void {
-		if (this._inheritAttempted) return;
-		const fresh =
-			!this.groupByPropertyId &&
-			!this.cardTitlePropertyId &&
-			!this.cardColorPropertyId &&
-			!this.imagePropertyId &&
-			!this._masonryMode &&
-			this.config.get('inheritedFrom') == null;
-		if (!fresh) return;
-		this._inheritAttempted = true;
-		void readSiblingKanbanViews(this.app, this.config.name).then((siblings) => {
-			if (this._closed || siblings.length === 0) return;
-			const sibling = siblings[0];
-			applyViewConfigCopy(this.config, sibling);
-			this.config.set('inheritedFrom', sibling.name);
-			new Notice(t('notice.inherited').replace('{name}', sibling.name));
-		});
-	}
-
-	/**
 	 * Non-blocking banner when the configured group-by property has no values
 	 * in the current data (typo, or every note lost the property). The board
 	 * still renders from persisted prefs — see the note in render().
@@ -2141,6 +2110,16 @@ export class KanbanView extends BasesView {
 						this._debouncedRender();
 					},
 				},
+				{
+					cssClass: 'obk-template-picker',
+					iconClass: 'obk-template-picker-icon',
+					activeClass: 'obk-template-picker--active',
+					label: () => '套用模板',
+					text: () => '模板',
+					icon: () => 'layout-template',
+					isActive: () => false,
+					onToggle: () => this._openTemplatePicker(),
+				},
 			]);
 		}
 		this._toolbarToggles.ensure();
@@ -2148,6 +2127,14 @@ export class KanbanView extends BasesView {
 
 	private _applyMinimalMode(): void {
 		this.containerEl.classList.toggle(CSS_CLASSES.MINIMAL, this._minimalMode);
+	}
+
+	private _openTemplatePicker(): void {
+		new TemplatePickerModal(this.app, DEFAULT_VIEW_TEMPLATES, (template) => {
+			applyViewTemplate(this.config, template);
+			this._debouncedRender();
+			new Notice(t('notice.copiedView').replace('{name}', template.name));
+		}).open();
 	}
 
 	private createColumn(

@@ -208,7 +208,8 @@ Renames and recolors also sync to the property suggester and, if you use the Met
 - **Column width**: a global slider, plus a per-column drag handle (double-click to reset).
 - **Minimal mode**: a toolbar toggle hides per-card property labels for a cleaner board.
 - **Demo board**: command palette → "Create demo board" builds a playground board (with both a kanban and a masonry flow view, so you learn the view switcher) without touching your notes. Done exploring? "Remove demo board" cleans it all up and never touches your own files.
-- **Views that don't break**: a new view auto-inherits the settings of your configured board; unconfigured views show a guided setup card, and a bad group-by property only shows a warning banner.
+- **Work templates**: a new empty view starts with **每日工作台（推薦）** or **專案進度看板**. Existing boards can use the toolbar **模板** action to reapply either one. Templates only change Base view settings, never cards or note frontmatter.
+- **Views that don't break**: unconfigured views show a guided setup card, and a bad group-by property only shows a warning banner.
 
 ### Data access
 

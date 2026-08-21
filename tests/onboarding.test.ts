@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { COPYABLE_KEYS, applyViewConfigCopy, readSiblingKanbanViews } from '../src/onboarding.ts';
+import {
+	COPYABLE_KEYS,
+	DEFAULT_VIEW_TEMPLATES,
+	applyViewConfigCopy,
+	applyViewTemplate,
+	readSiblingKanbanViews,
+} from '../src/onboarding.ts';
 import { createMockApp, createMockQueryController } from './helpers.ts';
 
 function appWithBase(views: unknown[] | string): ReturnType<typeof createMockApp> {
@@ -64,5 +70,23 @@ describe('applyViewConfigCopy', () => {
 		assert.deepStrictEqual(controller.config.get('cardColorOrder'), ['🟣 已面試', '🔴 淘汰']);
 		assert.strictEqual(controller.config.get('cardOrders'), null, 'cardOrders is per-view drag state, never copied');
 		assert.ok(!COPYABLE_KEYS.includes('cardOrders'));
+	});
+});
+
+describe('built-in view templates', () => {
+	test('offers daily workbench first and project progress second', () => {
+		assert.deepStrictEqual(
+			DEFAULT_VIEW_TEMPLATES.map((template) => template.name),
+			['每日工作台', '專案進度看板'],
+		);
+	});
+
+	test('applies every template setting without card drag state', () => {
+		const controller = createMockQueryController([], []) as any;
+		applyViewTemplate(controller.config, DEFAULT_VIEW_TEMPLATES[1]);
+		assert.strictEqual(controller.config.get('groupByProperty'), 'note.狀態');
+		assert.strictEqual(controller.config.get('masonryMode'), false);
+		assert.strictEqual(controller.config.get('inheritedFrom'), 'template:專案進度看板');
+		assert.strictEqual(controller.config.get('cardOrders'), null);
 	});
 });
