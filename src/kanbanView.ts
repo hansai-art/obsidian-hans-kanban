@@ -2504,6 +2504,28 @@ export class KanbanView extends BasesView {
 		this._columnSortables.set(value, sortable);
 	}
 
+	private getColumnPaths(bodyEl: Element): string[] {
+		const paths = Array.from(bodyEl.querySelectorAll(`.${CSS_CLASSES.CARD}`))
+			.map((card) => (card.instanceOf(HTMLElement) ? card.getAttribute(DATA_ATTRIBUTES.ENTRY_PATH) : null))
+			.filter((path): path is string => path !== null);
+		return [...new Set(paths)];
+	}
+
+	private persistCrossCellOrder(
+		oldColumnEl: Element | null,
+		oldColumnValue: string | null,
+		oldKey: string,
+		newKey: string,
+		newBody: Element,
+	): void {
+		if (oldColumnEl?.instanceOf(HTMLElement) && oldColumnValue) {
+			const oldBody = oldColumnEl.querySelector(`.${CSS_CLASSES.COLUMN_BODY}`);
+			if (oldBody) this._prefs.cardOrders[oldKey] = this.getColumnPaths(oldBody);
+		}
+		this._prefs.cardOrders[newKey] = this.getColumnPaths(newBody);
+		this._persistPrefs();
+	}
+
 	private async handleCardDrop(evt: Sortable.SortableEvent): Promise<void> {
 		if (!evt.item.instanceOf(HTMLElement)) {
 			console.warn('Card element is not an HTMLElement:', evt.item);
@@ -2552,16 +2574,6 @@ export class KanbanView extends BasesView {
 			: null;
 		const newLaneValue = swimlaneActive ? newLaneEl.getAttribute(DATA_ATTRIBUTES.SWIMLANE_VALUE) : null;
 
-		// Helper: read card paths from a column body element. Dedupe defensively:
-		// if duplicate cards ever make it into the DOM, persisting them here
-		// would corrupt cardOrders permanently.
-		const getColumnPaths = (bodyEl: Element): string[] => {
-			const paths = Array.from(bodyEl.querySelectorAll(`.${CSS_CLASSES.CARD}`))
-				.map((c) => (c.instanceOf(HTMLElement) ? c.getAttribute(DATA_ATTRIBUTES.ENTRY_PATH) : null))
-				.filter((p): p is string => p !== null);
-			return [...new Set(paths)];
-		};
-
 		const oldKey = this.cardOrderKey(oldLaneValue, oldColumnValue ?? '');
 		const newKey = this.cardOrderKey(newLaneValue, newColumnValue);
 		const sortActive = this.hasActiveSort();
@@ -2575,19 +2587,9 @@ export class KanbanView extends BasesView {
 				this.render();
 				return;
 			}
-			this._prefs.cardOrders[newKey] = getColumnPaths(evt.to);
+			this._prefs.cardOrders[newKey] = this.getColumnPaths(evt.to);
 			this._persistPrefs();
 			return;
-		}
-
-		// Cross-cell drop: capture DOM order for both source and destination
-		if (!sortActive) {
-			if (oldColumnEl?.instanceOf(HTMLElement) && oldColumnValue) {
-				const oldBody = oldColumnEl.querySelector(`.${CSS_CLASSES.COLUMN_BODY}`);
-				if (oldBody) this._prefs.cardOrders[oldKey] = getColumnPaths(oldBody);
-			}
-			this._prefs.cardOrders[newKey] = getColumnPaths(evt.to);
-			this._persistPrefs();
 		}
 
 		const entry = this._entryMap.get(entryPath);
@@ -2625,6 +2627,7 @@ export class KanbanView extends BasesView {
 					}
 				}
 			});
+			if (!sortActive) this.persistCrossCellOrder(oldColumnEl, oldColumnValue, oldKey, newKey, evt.to);
 		} catch (error) {
 			console.error('Error updating entry property:', error);
 			this.render();

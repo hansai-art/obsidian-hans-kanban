@@ -3097,6 +3097,45 @@ describe('Card Order - Persistence', () => {
 		);
 	});
 
+	test('Cross-column drop preserves manual order when the frontmatter write fails', async () => {
+		const entries = createEntriesWithStatus();
+		controller = createMockQueryController(entries, TEST_PROPERTIES);
+		controller.app = app;
+		controller.config.getAsPropertyId = () => PROPERTY_STATUS;
+		const existingOrders = {
+			[PROPERTY_STATUS]: { 'To Do': ['Task 2.md', 'Task 1.md'], Doing: ['Task 3.md'] },
+		};
+		controller.config.set('cardOrders', existingOrders);
+
+		const view = new KanbanView(controller, scrollEl);
+		setupKanbanViewWithApp(view, app);
+		triggerDataUpdate(view);
+
+		const originalRender = (view as any).render.bind(view);
+		let renderCalls = 0;
+		(view as any).render = (): void => {
+			renderCalls++;
+			originalRender();
+		};
+		const toDoBody = view.containerEl.querySelector('[data-column-value="To Do"] .obk-column-body') as HTMLElement;
+		const doingBody = view.containerEl.querySelector('[data-column-value="Doing"] .obk-column-body') as HTMLElement;
+		const card = toDoBody.querySelector('.obk-card') as HTMLElement;
+		toDoBody.removeChild(card);
+		doingBody.appendChild(card);
+		app.fileManager.processFrontMatter = async (): Promise<void> => {
+			throw new Error('vault write failed');
+		};
+
+		await (view as any).handleCardDrop({ item: card, from: toDoBody, to: doingBody, oldIndex: 0, newIndex: 1 });
+
+		assert.strictEqual(renderCalls, 1, 'failed drops must re-render from unchanged data');
+		assert.deepStrictEqual(
+			(view as any)._prefs.cardOrders,
+			existingOrders[PROPERTY_STATUS],
+			'failed drops must not persist the transient Sortable DOM order',
+		);
+	});
+
 	test('Initial render applies saved card order', () => {
 		const entries = createEntriesWithStatus();
 		controller = createMockQueryController(entries, TEST_PROPERTIES);
